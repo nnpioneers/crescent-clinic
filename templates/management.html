@@ -239,8 +239,8 @@
                             <span class="split-label">Doctor Profit</span>
                             <span class="split-val" id="dashDocProfit">₹0.00</span>
                         </div>
-                        <div class="split-card" style="margin-top: 10px;">
-                            <span class="split-label">Medicine Profit</span>
+                        <div class="split-card clickable-card" onclick="showMedicineDetails()" style="margin-top: 10px;">
+                            <span class="split-label" style="display:flex; align-items:center; gap:4px;">Medicine Profit <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></span>
                             <span class="split-val" id="dashMedProfit" style="color: var(--emerald);">₹0.00</span>
                         </div>
                         <div class="split-card clickable-card" onclick="showDirectSalesRevenueBreakdown()"
@@ -3762,7 +3762,9 @@
                             <th>Quantity</th>
                             <th style="text-align:right">Purchase Cost</th>
                             <th style="text-align:right">Selling Price</th>
-                            <th style="text-align:right">Payment Received</th>
+                            <th style="text-align:right">Payment Amount</th>
+                            <th style="text-align:right">Balance Due</th>
+                            <th>Payment Mode</th>
                             <th style="text-align:right">Profit</th>
                         </tr>
                     </thead>
@@ -3771,11 +3773,13 @@
             if (!res.all_medicines || res.all_medicines.length === 0) {
                 medItemsHtml += `<tr><td colspan="6" style="text-align:center">No medicines sold</td></tr>`;
             } else {
-                let sumCost = 0, sumRev = 0, sumPayRecv = 0, sumProf = 0;
+                let sumCost = 0, sumRev = 0, sumPayRecv = 0, sumBal = 0, sumProf = 0;
                 res.all_medicines.forEach(med => {
+                    const balance = (parseFloat(med.revenue) || 0) - (parseFloat(med.payment_received) || 0);
                     sumCost += parseFloat(med.cost) || 0;
                     sumRev += parseFloat(med.revenue) || 0;
                     sumPayRecv += parseFloat(med.payment_received) || 0;
+                    sumBal += balance;
                     sumProf += parseFloat(med.realized_profit) || 0;
                     const profitColor = med.realized_profit > 0 ? 'var(--emerald)' : (med.realized_profit < 0 ? 'var(--danger)' : 'inherit');
                     medItemsHtml += `
@@ -3787,6 +3791,8 @@
                             <td style="text-align:right; color:var(--text-light)">₹${(med.cost || 0).toFixed(2)}</td>
                             <td style="text-align:right">₹${(med.revenue || 0).toFixed(2)}</td>
                             <td style="text-align:right; font-weight:bold; color:var(--emerald);">₹${(med.payment_received || 0).toFixed(2)}</td>
+                            <td style="text-align:right; font-weight:bold; color:${balance > 0 ? 'var(--danger)' : 'var(--emerald)'};">${balance > 0 ? '₹' + balance.toFixed(2) : '✓ Cleared'}</td>
+                            <td style="font-size:0.85em;">-</td>
                             <td style="text-align:right; color:${profitColor}; font-weight:bold;">₹${(med.realized_profit || 0).toFixed(2)}</td>
                         </tr>
                     `;
@@ -3799,6 +3805,8 @@
                                 <td style="text-align:right; color:var(--text-light)">₹${sumCost.toFixed(2)}</td>
                                 <td style="text-align:right">₹${sumRev.toFixed(2)}</td>
                                 <td style="text-align:right; color:var(--emerald);">₹${sumPayRecv.toFixed(2)}</td>
+                                <td style="text-align:right; color:var(--danger);">₹${sumBal.toFixed(2)}</td>
+                                <td></td>
                                 <td style="text-align:right; color:var(--emerald);">₹${sumProf.toFixed(2)}</td>
                             </tr>
                         </tfoot>
