@@ -1368,9 +1368,17 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     $stmt2->execute($unmapped_params);
     $unmapped_results = $stmt2->fetchAll(PDO::FETCH_ASSOC);
     
-    // For original results, append is_unmapped = 0
+    // For original results, append is_unmapped = 0, unless it's a placeholder
     foreach ($results as &$r) {
-        $r['is_unmapped'] = 0;
+        if (strpos($r['batch_number'], 'ph_') === 0 || strtolower($r['brand_name']) === '(unmapped brand)' || strtolower($r['name']) === '(unmapped brand)') {
+            $r['is_unmapped'] = 1;
+            // Ensure the name displayed is the generic name if it's the unmapped placeholder
+            if (strtolower($r['name']) === '(unmapped brand)' && !empty($r['generic_name'])) {
+                $r['name'] = $r['generic_name'];
+            }
+        } else {
+            $r['is_unmapped'] = 0;
+        }
     }
     unset($r);
 
