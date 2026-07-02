@@ -1320,71 +1320,80 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     $stmt->execute($params);
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Include unmapped generics (0 brands)
-    $unmapped_conditions = ["LOWER(gm.brand_name) = '(unmapped brand)'"];
-    $unmapped_params = [];
-    if ($q) {
-        $unmapped_conditions[] = "gm.generic_name LIKE ?";
-        $unmapped_params[] = "%$q%";
-    }
-    
-    $unmapped_conditions[] = "gm.generic_name NOT IN (SELECT generic_name FROM inventory WHERE generic_name IS NOT NULL)";
-
-    if ($category === 'medicine') {
-        $unmapped_conditions[] = "gm.category NOT IN ('Injection', 'INJ', 'IV')";
-    } elseif ($category === 'Injection' || $category === 'INJ') {
-        $unmapped_conditions[] = "gm.category IN ('Injection', 'INJ')";
-    } elseif ($category) {
-        $unmapped_conditions[] = "gm.category = ?";
-        $unmapped_params[] = $category;
-    }
-
-    $unmapped_query = "
-        SELECT 
-            -(gm.id) as id,
-            gm.generic_name as name,
-            gm.generic_name,
-            gm.brand_name,
-            gm.agency_name,
-            gm.category,
-            NULL as hsn_code,
-            gm.batch_number,
-            NULL as mfg_date,
-            gm.expiry_date,
-            gm.mrp,
-            gm.purchase_rate as purchase_price,
-            gm.selling_rate as selling_price,
-            gm.stock,
-            gm.pack_size as tablets_per_strip,
-            gm.min_stock,
-            gm.row_location,
-            gm.col_location,
-            NULL as supplier_id,
-            1 as is_unmapped
-        FROM generic_mappings gm
-        WHERE " . implode(" AND ", $unmapped_conditions);
-    
-    $stmt2 = $conn->prepare($unmapped_query);
-    $stmt2->execute($unmapped_params);
-    $unmapped_results = $stmt2->fetchAll(PDO::FETCH_ASSOC);
-    
-    // For original results, append is_unmapped = 0, unless it's a placeholder
-    foreach ($results as &$r) {
-        if (strpos($r['batch_number'], 'ph_') === 0 || strtolower($r['brand_name']) === '(unmapped brand)' || strtolower($r['name']) === '(unmapped brand)') {
-            $r['is_unmapped'] = 1;
-            // Ensure the name displayed is the generic name if it's the unmapped placeholder
-            if (strtolower($r['name']) === '(unmapped brand)' && !empty($r['generic_name'])) {
-                $r['name'] = $r['generic_name'];
-            }
-        } else {
-            $r['is_unmapped'] = 0;
+    // Find all distinct generic names matching the search
+    $distinct_generics = [];
+    foreach ($results as $r) {
+        if (!empty($r['generic_name'])) {
+            $distinct_generics[$r['generic_name']] = 1;
         }
     }
-    unset($r);
 
-    $final_results = array_merge($results, $unmapped_results);
+    $gm_conditions = [];
+    $gm_params = [];
+    if ($q) {
+        $gm_conditions[] = "generic_name LIKE ?";
+        $gm_params[] = "%$q%";
+    }
+    if ($category === 'medicine') {
+        $gm_conditions[] = "category NOT IN ('Injection', 'INJ', 'IV')";
+    } elseif ($category === 'Injection' || $category === 'INJ') {
+        $gm_conditions[] = "category IN ('Injection', 'INJ')";
+    } elseif ($category) {
+        $gm_conditions[] = "category = ?";
+        $gm_params[] = $category;
+    }
+
+    $gm_query = "SELECT DISTINCT generic_name FROM generic_mappings";
+    if ($gm_conditions) {
+        $gm_query .= " WHERE " . implode(" AND ", $gm_conditions);
+    }
+    $stmt2 = $conn->prepare($gm_query);
+    $stmt2->execute($gm_params);
+    $gm_generics = $stmt2->fetchAll(PDO::FETCH_COLUMN);
+
+    foreach ($gm_generics as $g_name) {
+        if (!empty($g_name)) {
+            $distinct_generics[$g_name] = 1;
+        }
+    }
+
+    $generic_headers = [];
+    $stmt_count = $conn->prepare("SELECT COUNT(*) FROM inventory WHERE generic_name = ? AND name != '(Unmapped Brand)' AND batch_number NOT LIKE 'ph_%'");
+    
+    foreach (array_keys($distinct_generics) as $g_name) {
+        $stmt_count->execute([$g_name]);
+        $brand_count = (int)$stmt_count->fetchColumn();
+
+        $generic_headers[] = [
+            'id' => -1 * abs(crc32($g_name)),
+            'name' => $g_name,
+            'generic_name' => $g_name,
+            'is_unmapped' => 1,
+            'is_generic_header' => 1,
+            'brand_count' => $brand_count,
+            'selling_price' => 0,
+            'tablets_per_strip' => 0
+        ];
+    }
+
+    $filtered_results = [];
+    foreach ($results as $r) {
+        if (strpos($r['batch_number'], 'ph_') === 0 || strtolower($r['brand_name']) === '(unmapped brand)' || strtolower($r['name']) === '(unmapped brand)') {
+            continue;
+        }
+        $r['is_unmapped'] = 0;
+        $r['is_generic_header'] = 0;
+        $filtered_results[] = $r;
+    }
+
+    $final_results = array_merge($generic_headers, $filtered_results);
     
     usort($final_results, function($a, $b) {
+        $header_a = $a['is_generic_header'] ?? 0;
+        $header_b = $b['is_generic_header'] ?? 0;
+        if ($header_a !== $header_b) {
+            return $header_b - $header_a; // 1 before 0
+        }
         return strcmp($a['name'], $b['name']);
     });
     
