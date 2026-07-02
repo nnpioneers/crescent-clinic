@@ -4613,12 +4613,12 @@ if ($uri === '/api/cron/backup' && $method === 'GET') {
 function sync_generic_mappings($conn) {
     // 0. Auto-cleanup duplicates caused by previous race conditions
     try {
-        // Fix batch numbers FIRST across all 3 tables
-        $conn->exec("UPDATE generic_mappings SET batch_number = 'BATCH-01' WHERE batch_number IS NULL OR batch_number = '-' OR batch_number = ''");
-        $conn->exec("UPDATE inventory SET batch_number = 'BATCH-01' WHERE batch_number IS NULL OR batch_number = '-' OR batch_number = ''");
-        $conn->exec("UPDATE agency_items SET batch_number = 'BATCH-01' WHERE batch_number IS NULL OR batch_number = '-' OR batch_number = ''");
+        // Fix batch numbers using IGNORE to avoid unique constraint violations
+        $conn->exec("UPDATE IGNORE generic_mappings SET batch_number = 'BATCH-01' WHERE batch_number IS NULL OR batch_number = '-' OR batch_number = ''");
+        $conn->exec("UPDATE IGNORE inventory SET batch_number = 'BATCH-01' WHERE batch_number IS NULL OR batch_number = '-' OR batch_number = ''");
+        $conn->exec("UPDATE IGNORE agency_items SET batch_number = 'BATCH-01' WHERE batch_number IS NULL OR batch_number = '-' OR batch_number = ''");
 
-        // Now delete the TRUE duplicates (since they all have BATCH-01 now)
+        // Now delete the TRUE duplicates (where batch numbers are exactly the same)
         $conn->exec("
             DELETE gm1 FROM generic_mappings gm1
             INNER JOIN generic_mappings gm2 
@@ -4643,6 +4643,25 @@ function sync_generic_mappings($conn) {
               AND (ai1.generic_name = ai2.generic_name OR (ai1.generic_name IS NULL AND ai2.generic_name IS NULL))
               AND ai1.batch_number = ai2.batch_number
         ");
+
+        // Force delete any lingering '-' batches if a 'BATCH-01' already exists for that brand
+        // (This handles the case where UPDATE IGNORE skipped them)
+        $conn->exec("
+            DELETE FROM generic_mappings 
+            WHERE (batch_number IS NULL OR batch_number = '-' OR batch_number = '')
+              AND brand_name IN (SELECT * FROM (SELECT brand_name FROM generic_mappings WHERE batch_number = 'BATCH-01') AS tmp)
+        ");
+        $conn->exec("
+            DELETE FROM inventory 
+            WHERE (batch_number IS NULL OR batch_number = '-' OR batch_number = '')
+              AND name IN (SELECT * FROM (SELECT name FROM inventory WHERE batch_number = 'BATCH-01') AS tmp)
+        ");
+        $conn->exec("
+            DELETE FROM agency_items 
+            WHERE (batch_number IS NULL OR batch_number = '-' OR batch_number = '')
+              AND item_name IN (SELECT * FROM (SELECT item_name FROM agency_items WHERE batch_number = 'BATCH-01') AS tmp)
+        ");
+
     } catch (Exception $e) {
         // Silently ignore cleanup errors
     }
