@@ -1318,7 +1318,69 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     
     $stmt = $conn->prepare($query);
     $stmt->execute($params);
-    json_response($stmt->fetchAll());
+    $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Include unmapped generics (0 brands)
+    $unmapped_conditions = ["LOWER(gm.brand_name) = '(unmapped brand)'"];
+    $unmapped_params = [];
+    if ($q) {
+        $unmapped_conditions[] = "gm.generic_name LIKE ?";
+        $unmapped_params[] = "%$q%";
+    }
+    
+    $unmapped_conditions[] = "gm.generic_name NOT IN (SELECT generic_name FROM inventory WHERE generic_name IS NOT NULL)";
+
+    if ($category === 'medicine') {
+        $unmapped_conditions[] = "gm.category NOT IN ('Injection', 'INJ', 'IV')";
+    } elseif ($category === 'Injection' || $category === 'INJ') {
+        $unmapped_conditions[] = "gm.category IN ('Injection', 'INJ')";
+    } elseif ($category) {
+        $unmapped_conditions[] = "gm.category = ?";
+        $unmapped_params[] = $category;
+    }
+
+    $unmapped_query = "
+        SELECT 
+            -(gm.id) as id,
+            gm.generic_name as name,
+            gm.generic_name,
+            gm.brand_name,
+            gm.agency_name,
+            gm.category,
+            NULL as hsn_code,
+            gm.batch_number,
+            NULL as mfg_date,
+            gm.expiry_date,
+            gm.mrp,
+            gm.purchase_rate as purchase_price,
+            gm.selling_rate as selling_price,
+            gm.stock,
+            gm.pack_size as tablets_per_strip,
+            gm.min_stock,
+            gm.row_location,
+            gm.col_location,
+            NULL as supplier_id,
+            1 as is_unmapped
+        FROM generic_mappings gm
+        WHERE " . implode(" AND ", $unmapped_conditions);
+    
+    $stmt2 = $conn->prepare($unmapped_query);
+    $stmt2->execute($unmapped_params);
+    $unmapped_results = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+    
+    // For original results, append is_unmapped = 0
+    foreach ($results as &$r) {
+        $r['is_unmapped'] = 0;
+    }
+    unset($r);
+
+    $final_results = array_merge($results, $unmapped_results);
+    
+    usort($final_results, function($a, $b) {
+        return strcmp($a['name'], $b['name']);
+    });
+    
+    json_response($final_results);
 }
 
 if ($uri === '/api/inventory/add' && $method === 'POST') {
@@ -1574,6 +1636,40 @@ if ($uri === '/api/inventory/update' && $method === 'POST') {
     $actual_unit_cost = ((int)$tablets_per_strip > 0) ? ((float)$purchase_price / (int)$tablets_per_strip) : (float)$purchase_price;
     backfill_historical_medicine_cost($conn, $name, $actual_unit_cost);
 
+    json_response(['success' => true]);
+}
+
+if ($uri === '/api/inventory/auto_create_brand' && $method === 'POST') {
+    enforce_api_auth(['pharmacist', 'receptionist', 'doctor']);
+    $conn = get_db();
+    
+    $generic_name = trim($input['generic_name'] ?? '');
+    $brand_name = trim($input['brand_name'] ?? '');
+    $unit_price = (float)($input['unit_price'] ?? 0);
+    
+    if (!$generic_name || !$brand_name) {
+        json_response(['error' => 'Generic Name and Brand Name are required'], 400);
+    }
+    
+    // Check if brand already exists in inventory
+    $chk = $conn->prepare("SELECT id FROM inventory WHERE TRIM(LOWER(name)) = TRIM(LOWER(?))");
+    $chk->execute([$brand_name]);
+    if ($chk->fetch()) {
+        json_response(['success' => true, 'message' => 'Brand already exists']);
+    }
+    
+    // 1. Insert into inventory (0 stock, but available for sale)
+    $stmt = $conn->prepare("INSERT INTO inventory (name, generic_name, mrp, selling_price, purchase_price, stock, category) VALUES (?, ?, ?, ?, ?, 0, 'TAB')");
+    $stmt->execute([$brand_name, $generic_name, $unit_price, $unit_price, $unit_price]);
+    
+    // 2. Insert into agency_items
+    $stmt2 = $conn->prepare("INSERT INTO agency_items (item_name, generic_name, mrp, selling_price, purchase_price, stock, batch_number) VALUES (?, ?, ?, ?, ?, 0, 'BATCH-01')");
+    $stmt2->execute([$brand_name, $generic_name, $unit_price, $unit_price, $unit_price]);
+    
+    // 3. Update generic mappings (force sync will catch it next time, but we can proactively insert)
+    $stmt3 = $conn->prepare("INSERT INTO generic_mappings (brand_name, generic_name, mrp, stock) VALUES (?, ?, ?, 0) ON DUPLICATE KEY UPDATE generic_name = VALUES(generic_name), mrp = VALUES(mrp)");
+    $stmt3->execute([$brand_name, $generic_name, $unit_price]);
+    
     json_response(['success' => true]);
 }
 

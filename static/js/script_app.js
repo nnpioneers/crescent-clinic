@@ -1380,8 +1380,11 @@ if (!String.prototype.toFixed) {
                     <div class="med-sugg-item ${activeClass}" style="padding:10px 12px; cursor:pointer; border-bottom:1px solid var(--border); transition: background 0.15s; ${activeStyle}" 
                          onmouseenter="this.parentElement.querySelectorAll('.med-sugg-item').forEach(i => {i.classList.remove('active-sugg'); i.style.background=''}); this.classList.add('active-sugg'); this.style.background='var(--bg-hover)';"
                          onmouseleave="this.classList.remove('active-sugg'); this.style.background=''"
-                         onclick="selectMedicine(this, '${item.name.replace(/'/g, "\\'")}', ${item.selling_price}, ${item.id}, ${item.tablets_per_strip || 0})">
-                        <div style="font-weight:700; color:var(--text-primary); margin-bottom:2px; font-size:0.95em; letter-spacing:0.02em;">${item.name}</div>
+                         onclick="selectMedicine(this, '${item.name.replace(/'/g, "\\'")}', ${item.selling_price}, ${item.id}, ${item.tablets_per_strip || 0}, ${item.is_unmapped || 0})">
+                        <div style="font-weight:700; color:var(--text-primary); margin-bottom:2px; font-size:0.95em; letter-spacing:0.02em;">
+                            ${item.name}
+                            ${item.is_unmapped == 1 ? '<span style="color:var(--danger); font-size:0.85em; margin-left:8px; font-weight:500;">— No Brand Available Yet</span>' : ''}
+                        </div>
                         ${item.generic_name ? `<div style="font-size:0.78em; color:#6366f1; font-style:italic; margin-bottom:4px; font-weight:500;">Generic: ${item.generic_name}</div>` : ''}
                         ${item.agency_name ? `<div style="font-size:0.8em; color:var(--text-secondary); margin-bottom:4px;">Agency : ${item.agency_name}</div>` : ''}
                         <div style="font-size:0.8em; color:var(--text-secondary); margin-bottom:4px; display:flex; flex-direction:column; gap:2px;">
@@ -1406,20 +1409,37 @@ if (!String.prototype.toFixed) {
         }
     };
 
-    window.selectMedicine = function (el, name, price, batchId, tps) {
+    window.selectMedicine = function (el, name, price, batchId, tps, isUnmapped) {
         const row = el.closest('.medicine-row');
         row.querySelector('.med-name').value = name;
         row.querySelector('.med-price').value = price;
         row.querySelector('.med-batch-id').value = batchId || '';
         row.querySelector('.med-tps').value = tps || 0;
 
+        // Clean up any existing unmapped brand input
+        const existingUnmapped = row.querySelector('.unmapped-brand-input');
+        if (existingUnmapped) existingUnmapped.remove();
+
+        if (isUnmapped == 1) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'unmapped-brand-input';
+            wrapper.style.marginTop = '8px';
+            wrapper.innerHTML = `<label style="font-size:0.85em; color:var(--text-secondary); margin-bottom:4px; display:block;">Brand Name (Optional)</label>
+                                 <input type="text" class="form-control med-new-brand" placeholder="Enter Brand Name" style="font-size:0.9em; border-color:#6366f1;">`;
+            row.querySelector('.med-name').parentNode.appendChild(wrapper);
+        }
+
         row.querySelector('.med-suggestions').style.display = 'none';
         calcRowAmount(row.querySelector('.med-qty'));
 
         setTimeout(() => {
-            const qtyInput = row.querySelector('.med-qty');
-            qtyInput.focus();
-            qtyInput.select();
+            if (isUnmapped == 1) {
+                row.querySelector('.med-new-brand').focus();
+            } else {
+                const qtyInput = row.querySelector('.med-qty');
+                qtyInput.focus();
+                qtyInput.select();
+            }
         }, 10);
     };
 
@@ -1727,6 +1747,38 @@ if (!String.prototype.toFixed) {
     window.submitMedicines = async function (sendWhatsApp = false) {
         if (!currentPrescId) return;
         const rows = $$('#medicineRows .medicine-row');
+        
+        // --- STEP 0: Auto-create any new brands ---
+        for (let row of rows) {
+            const genericName = row.querySelector('.med-name').value.trim();
+            const brandInput = row.querySelector('.med-new-brand');
+            if (brandInput) {
+                const newBrand = brandInput.value.trim();
+                if (newBrand) {
+                    const amount = parseFloat(row.querySelector('.med-amount').value) || 0;
+                    const tps = parseInt(row.querySelector('.med-tps').value) || 0;
+                    const strips = parseFloat(row.querySelector('.med-strips').value) || 0;
+                    const tablets = parseFloat(row.querySelector('.med-qty').value) || 0;
+                    const totalQty = (strips * tps) + tablets;
+                    const unitPrice = totalQty > 0 ? (amount / totalQty) : 0;
+                    
+                    try {
+                        const res = await api('/api/inventory/auto_create_brand', {
+                            method: 'POST',
+                            body: { generic_name: genericName, brand_name: newBrand, unit_price: unitPrice }
+                        });
+                        if (res.success) {
+                            row.querySelector('.med-name').value = newBrand;
+                            const wrapper = brandInput.closest('.unmapped-brand-input');
+                            if (wrapper) wrapper.remove();
+                        }
+                    } catch (e) {
+                        return toast('Failed to auto-create brand for ' + genericName, 'error');
+                    }
+                }
+            }
+        }
+
         const medicines = [];
         rows.forEach(row => {
             const name = row.querySelector('.med-name').value.trim();
