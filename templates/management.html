@@ -3729,9 +3729,196 @@
             });
         }
 
+        function showDoctorDetails() {
+            if (!window.currentAnalyticsData) return;
+            const res = window.currentAnalyticsData;
+            let html = `
+                <table class="data-table">
+                    <thead><tr><th>Doctor</th><th style="text-align:right">Revenue Generated</th></tr></thead>
+                    <tbody>
+            `;
+            let hasDocs = false;
+            for (const docId in res.doctor_stats) {
+                const doc = res.doctor_stats[docId];
+                html += `<tr><td>${doc.doctor_name}</td><td style="text-align:right">₹${doc.total_revenue.toFixed(2)}</td></tr>`;
+                hasDocs = true;
+            }
+            if (!hasDocs) html += `<tr><td colspan="2" style="text-align:center">No doctor fees generated</td></tr>`;
+            html += `</tbody></table>`;
+            document.getElementById('doctorBreakdownModalBody').innerHTML = html;
+            openModal('doctorBreakdownModal');
         }
 
-        function showScanDetails() {
+                function showMedicineRevenueBreakdown() {
+            if (!window.currentAnalyticsData) return;
+            const res = window.currentAnalyticsData;
+            
+            let html = `
+                <div style="margin-bottom:15px;">
+                    <h4>Doctor Consultation Medicine Revenue Breakdown</h4>
+                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Patient Name</th>
+                            <th>Date &amp; Time</th>
+                            <th>Doctor</th>
+                            <th>Medicines Sold</th>
+                            <th>Quantity</th>
+                            <th style="text-align:right">Total Bill</th>
+                            <th style="text-align:right">Payment Amount</th>
+                            <th style="text-align:right">Balance Due</th>
+                            <th>Payment Mode</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            const txns = res.all_med_transactions || [];
+            if (txns.length === 0) {
+                html += `<tr><td colspan="9" style="text-align:center">No prescription transactions found</td></tr>`;
+            } else {
+                let sumBill = 0, sumPaid = 0, sumBal = 0;
+                txns.forEach(tx => {
+                    let dateStr = tx.created_at;
+                    try { const d = new Date(tx.created_at); dateStr = d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch(e){}
+                    const bill = parseFloat(tx.total_bill) || 0;
+                    const paid = parseFloat(tx.paid_amount) || 0;
+                    const bal  = parseFloat(tx.balance_amount) || 0;
+                    const meds = tx.medicines || [];
+                    
+                    sumBill += bill; sumPaid += paid; sumBal += bal;
+                    const balColor = bal > 0 ? 'var(--danger)' : 'var(--emerald)';
+
+                    if (meds.length === 0) {
+                        html += `
+                            <tr>
+                                <td><strong>${tx.patient_name}</strong></td>
+                                <td style="font-size:0.85em; color:var(--text-muted);">${dateStr}</td>
+                                <td style="font-size:0.85em;">${tx.doctor_name || '-'}</td>
+                                <td style="font-size:0.85em; color:var(--text-muted)">Other Fees</td>
+                                <td style="text-align:center">-</td>
+                                <td style="text-align:right; font-weight:bold;">₹${bill.toFixed(2)}</td>
+                                <td style="text-align:right; font-weight:bold; color:var(--emerald);">₹${paid.toFixed(2)}</td>
+                                <td style="text-align:right; font-weight:bold; color:${balColor};">${bal > 0 ? '₹' + bal.toFixed(2) : '✓ Cleared'}</td>
+                                <td style="font-size:0.85em;">${tx.payment_mode}</td>
+                            </tr>
+                        `;
+                    } else {
+                        meds.forEach((m, idx) => {
+                            const ret = parseFloat(m.returned_qty) || 0;
+                            const originalQty = parseFloat(m.qty) || 0;
+                            const qty = originalQty - ret;
+                            let medNameDisplay = m.name;
+                            let qtyHtml = ``;
+                            if (ret > 0) {
+                                qtyHtml = `<div style="font-size:0.85em; color:var(--text-muted);">Purchased: ${originalQty}</div><div style="font-size:0.85em; color:var(--danger);">Returned: -${ret}</div><div style="font-weight:bold; border-top:1px solid var(--border); margin-top:2px; padding-top:2px;">Net: ${qty}</div>`;
+                            } else {
+                                qtyHtml = `${originalQty}`;
+                            }
+
+                            const billCell = idx === 0 ? `₹${bill.toFixed(2)}` : '';
+                            const paidCell = idx === 0 ? `₹${paid.toFixed(2)}` : '';
+                            const balCell  = idx === 0 ? (bal > 0 ? `₹${bal.toFixed(2)}` : '✓ Cleared') : '';
+                            const balCellColor = idx === 0 ? balColor : 'inherit';
+
+                            html += `
+                                <tr>
+                                    <td><strong>${tx.patient_name}</strong></td>
+                                    <td style="font-size:0.85em; color:var(--text-muted);">${dateStr}</td>
+                                    <td style="font-size:0.85em;">${tx.doctor_name || '-'}</td>
+                                    <td style="font-size:0.85em;">${medNameDisplay}</td>
+                                    <td style="text-align:center">${qtyHtml}</td>
+                                    <td style="text-align:right; font-weight:bold;">${billCell}</td>
+                                    <td style="text-align:right; font-weight:bold; color:var(--emerald);">${paidCell}</td>
+                                    <td style="text-align:right; font-weight:bold; color:${balCellColor};">${balCell}</td>
+                                    <td style="font-size:0.85em;">${idx === 0 ? tx.payment_mode : ''}</td>
+                                </tr>
+                            `;
+                        });
+                    }
+                });
+                html += `
+                        </tbody>
+                        <tfoot>
+                            <tr style="background:var(--bg-hover); font-weight:bold;">
+                                <td colspan="5" style="text-align:right;">Totals:</td>
+                                <td style="text-align:right;">₹${sumBill.toFixed(2)}</td>
+                                <td style="text-align:right; color:var(--emerald);">₹${sumPaid.toFixed(2)}</td>
+                                <td style="text-align:right; color:var(--danger);">₹${sumBal.toFixed(2)}</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                `;
+            }
+            html += `</table>`;
+            
+            document.getElementById('medicineBreakdownModalBody').innerHTML = html;
+            openModal('medicineBreakdownModal');
+        }
+
+        function showMedicineProfitBreakdown() {
+            if (!window.currentAnalyticsData) return;
+            const res = window.currentAnalyticsData;
+            
+            let html = `
+                <div style="margin-bottom:15px;">
+                    <h4>Doctor Consultation Medicine Profit Breakdown</h4>
+                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Medicine Name</th>
+                            <th>Quantity</th>
+                            <th style="text-align:right">Purchase Cost</th>
+                            <th style="text-align:right">Selling Price</th>
+                            <th style="text-align:right">Payment Received</th>
+                            <th style="text-align:right">Profit</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            if (!res.all_medicines || res.all_medicines.length === 0) {
+                html += `<tr><td colspan="6" style="text-align:center">No medicines sold</td></tr>`;
+            } else {
+                let sumCost = 0, sumRev = 0, sumPayRecv = 0, sumProf = 0;
+                res.all_medicines.forEach(med => {
+                    sumCost += parseFloat(med.cost) || 0;
+                    sumRev += parseFloat(med.revenue) || 0;
+                    sumPayRecv += parseFloat(med.payment_received) || 0;
+                    sumProf += parseFloat(med.realized_profit) || 0;
+                    const profitColor = med.realized_profit > 0 ? 'var(--emerald)' : (med.realized_profit < 0 ? 'var(--danger)' : 'inherit');
+                    html += `
+                        <tr>
+                            <td>${med.name}</td>
+                            <td style="text-align:right">
+                                ${(med.returned_qty > 0) ? `<div style="font-size:0.85em; color:var(--text-muted);">Purchased: ${med.purchased_qty}</div><div style="font-size:0.85em; color:var(--danger);">Returned: -${med.returned_qty}</div><div style="font-weight:bold; border-top:1px solid var(--border); margin-top:2px; padding-top:2px;">Net: ${med.qty}</div>` : med.qty}
+                            </td>
+                            <td style="text-align:right; color:var(--text-light)">₹${(med.cost || 0).toFixed(2)}</td>
+                            <td style="text-align:right">₹${(med.revenue || 0).toFixed(2)}</td>
+                            <td style="text-align:right; font-weight:bold; color:var(--emerald);">₹${(med.payment_received || 0).toFixed(2)}</td>
+                            <td style="text-align:right; color:${profitColor}; font-weight:bold;">₹${(med.realized_profit || 0).toFixed(2)}</td>
+                        </tr>
+                    `;
+                });
+                html += `
+                        </tbody>
+                        <tfoot>
+                            <tr style="background:var(--bg-hover); font-weight:bold;">
+                                <td colspan="2" style="text-align:right;">Totals:</td>
+                                <td style="text-align:right;">₹${sumCost.toFixed(2)}</td>
+                                <td style="text-align:right;">₹${sumRev.toFixed(2)}</td>
+                                <td style="text-align:right; color:var(--emerald);">₹${sumPayRecv.toFixed(2)}</td>
+                                <td style="text-align:right; color:var(--emerald);">₹${sumProf.toFixed(2)}</td>
+                            </tr>
+                        </tfoot>
+                `;
+            }
+            html += `</table>`;
+            document.getElementById('medicineBreakdownModalBody').innerHTML = html;
+            openModal('medicineBreakdownModal');
+        }
+
+function showScanDetails() {
             if (!window.currentAnalyticsData) return;
             const res = window.currentAnalyticsData;
             let html = `
