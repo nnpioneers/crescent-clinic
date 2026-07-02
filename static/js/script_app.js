@@ -1895,9 +1895,9 @@ if (!String.prototype.toFixed) {
                 closeModal('medicineModal');
 
                 if (currentPrescId === 'direct') {
-                    if (window.loadDirectSales) window.loadDirectSales();
+                    if (window.loadDirectSales) await window.loadDirectSales();
                 } else {
-                    loadPatients();
+                    await loadPatients();
                 }
 
                 // If WhatsApp requested, generate the bill image and open the share flow
