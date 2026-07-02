@@ -1,7 +1,1 @@
-<?php
-try {
-    $conn = new PDO("mysql:host=127.0.0.1;dbname=u526658771_crescent", "u526658771_nnp", "Namaraja@4");
-    echo "Connected!";
-} catch (PDOException $e) {
-    echo "Error: " . $e->getMessage();
-}
+<?php require "auth.php"; $conn = get_db(); $stmt = $conn->query("DESCRIBE direct_sales"); print_r($stmt->fetchAll(PDO::FETCH_ASSOC));

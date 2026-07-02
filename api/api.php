@@ -1668,27 +1668,50 @@ if ($uri === '/api/inventory/auto_create_brand' && $method === 'POST') {
         json_response(['error' => 'Generic Name and Brand Name are required'], 400);
     }
     
-    // Check if brand already exists in inventory (case-insensitive)
-    $chk = $conn->prepare("SELECT id FROM inventory WHERE TRIM(LOWER(name)) = TRIM(LOWER(?))");
-    $chk->execute([$brand_name]);
-    if ($chk->fetch()) {
-        json_response(['success' => true, 'message' => 'Brand already exists']);
+    // Use MySQL Named Lock to prevent race conditions (double clicks)
+    $lockName = 'brand_create_' . md5(strtolower($brand_name));
+    $conn->exec("SELECT GET_LOCK('$lockName', 5)");
+    
+    try {
+        // 1. Check if brand already exists under this generic medicine (Case-Insensitive)
+        $chk = $conn->prepare("SELECT id FROM generic_mappings WHERE TRIM(LOWER(generic_name)) = TRIM(LOWER(?)) AND TRIM(LOWER(brand_name)) = TRIM(LOWER(?))");
+        $chk->execute([$generic_name, $brand_name]);
+        if ($chk->fetch()) {
+            $conn->exec("SELECT RELEASE_LOCK('$lockName')");
+            json_response(['success' => true, 'message' => 'Brand already exists']);
+        }
+        
+        // Also check if it exists globally in inventory to avoid creating duplicate inventory names
+        $chk2 = $conn->prepare("SELECT id FROM inventory WHERE TRIM(LOWER(name)) = TRIM(LOWER(?))");
+        $chk2->execute([$brand_name]);
+        if ($chk2->fetch()) {
+            // It's in inventory but maybe not mapped to this generic. Map it.
+            $batch = 'BATCH-01';
+            $stmt3 = $conn->prepare("INSERT INTO generic_mappings (brand_name, generic_name, mrp, stock, batch_number) VALUES (?, ?, ?, 0, ?) ON DUPLICATE KEY UPDATE generic_name = VALUES(generic_name), mrp = VALUES(mrp)");
+            $stmt3->execute([$brand_name, $generic_name, $unit_price, $batch]);
+            
+            $conn->exec("SELECT RELEASE_LOCK('$lockName')");
+            json_response(['success' => true, 'message' => 'Brand mapped from existing inventory']);
+        }
+        
+        // Use a consistent batch number so sync_generic_mappings merges them into 1 row
+        $batch = 'BATCH-01';
+        
+        // 1. Insert into inventory (0 stock, but available for sale)
+        $stmt = $conn->prepare("INSERT INTO inventory (name, generic_name, mrp, selling_price, purchase_price, stock, category, batch_number) VALUES (?, ?, ?, ?, ?, 0, 'TAB', ?)");
+        $stmt->execute([$brand_name, $generic_name, $unit_price, $unit_price, $unit_price, $batch]);
+        
+        // 2. Insert into agency_items
+        $stmt2 = $conn->prepare("INSERT INTO agency_items (item_name, generic_name, mrp, selling_price, purchase_price, stock, batch_number) VALUES (?, ?, ?, ?, ?, 0, ?)");
+        $stmt2->execute([$brand_name, $generic_name, $unit_price, $unit_price, $unit_price, $batch]);
+        
+        // 3. Update generic mappings
+        $stmt3 = $conn->prepare("INSERT INTO generic_mappings (brand_name, generic_name, mrp, stock, batch_number) VALUES (?, ?, ?, 0, ?) ON DUPLICATE KEY UPDATE generic_name = VALUES(generic_name), mrp = VALUES(mrp)");
+        $stmt3->execute([$brand_name, $generic_name, $unit_price, $batch]);
+        
+    } finally {
+        $conn->exec("SELECT RELEASE_LOCK('$lockName')");
     }
-    
-    // Use a consistent batch number so sync_generic_mappings merges them into 1 row
-    $batch = 'BATCH-01';
-    
-    // 1. Insert into inventory (0 stock, but available for sale)
-    $stmt = $conn->prepare("INSERT INTO inventory (name, generic_name, mrp, selling_price, purchase_price, stock, category, batch_number) VALUES (?, ?, ?, ?, ?, 0, 'TAB', ?)");
-    $stmt->execute([$brand_name, $generic_name, $unit_price, $unit_price, $unit_price, $batch]);
-    
-    // 2. Insert into agency_items
-    $stmt2 = $conn->prepare("INSERT INTO agency_items (item_name, generic_name, mrp, selling_price, purchase_price, stock, batch_number) VALUES (?, ?, ?, ?, ?, 0, ?)");
-    $stmt2->execute([$brand_name, $generic_name, $unit_price, $unit_price, $unit_price, $batch]);
-    
-    // 3. Update generic mappings
-    $stmt3 = $conn->prepare("INSERT INTO generic_mappings (brand_name, generic_name, mrp, stock, batch_number) VALUES (?, ?, ?, 0, ?) ON DUPLICATE KEY UPDATE generic_name = VALUES(generic_name), mrp = VALUES(mrp)");
-    $stmt3->execute([$brand_name, $generic_name, $unit_price, $batch]);
     
     json_response(['success' => true]);
 }

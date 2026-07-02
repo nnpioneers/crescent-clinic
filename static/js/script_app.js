@@ -1762,7 +1762,13 @@ if (!String.prototype.toFixed) {
 
     window.submitMedicines = async function (sendWhatsApp = false) {
         if (!currentPrescId) return;
-        const rows = $$('#medicineRows .medicine-row');
+        
+        // Prevent double submission
+        const saveBtns = $$('.modal-footer button');
+        saveBtns.forEach(btn => btn.disabled = true);
+        
+        try {
+            const rows = $$('#medicineRows .medicine-row');
         
         // --- STEP 0: Auto-create any new brands ---
         for (let row of rows) {
@@ -1936,6 +1942,8 @@ if (!String.prototype.toFixed) {
         } catch (err) {
             if (waWin) waWin.close();
             console.error('Save Billing Error:', err);
+        } finally {
+            saveBtns.forEach(btn => btn.disabled = false);
         }
     };
 
