@@ -1376,14 +1376,26 @@ if (!String.prototype.toFixed) {
                         extraLabel = `Pack : ${item.tablets_per_strip || 1} ${pluralCat} / Pack`;
                     }
 
+                    if (item.is_unmapped == 1) {
+                        return `
+                        <div class="med-sugg-item ${activeClass}" style="padding:10px 12px; cursor:pointer; border-bottom:1px solid var(--border); transition: background 0.15s; ${activeStyle}" 
+                             onmouseenter="this.parentElement.querySelectorAll('.med-sugg-item').forEach(i => {i.classList.remove('active-sugg'); i.style.background=''}); this.classList.add('active-sugg'); this.style.background='var(--bg-hover)';"
+                             onmouseleave="this.classList.remove('active-sugg'); this.style.background=''"
+                             onclick="selectMedicine(this, '${item.name.replace(/'/g, "\\'")}', ${item.selling_price || 0}, ${item.id}, ${item.tablets_per_strip || 0}, 1)">
+                            <div style="font-weight:700; color:var(--text-primary); margin-bottom:2px; font-size:0.95em; letter-spacing:0.02em;">
+                                ${item.name}
+                            </div>
+                            <div style="font-size:0.85em; font-weight:500; color:var(--text-secondary); margin-top:2px;">Brand Count: 0</div>
+                        </div>`;
+                    }
+
                     return `
                     <div class="med-sugg-item ${activeClass}" style="padding:10px 12px; cursor:pointer; border-bottom:1px solid var(--border); transition: background 0.15s; ${activeStyle}" 
                          onmouseenter="this.parentElement.querySelectorAll('.med-sugg-item').forEach(i => {i.classList.remove('active-sugg'); i.style.background=''}); this.classList.add('active-sugg'); this.style.background='var(--bg-hover)';"
                          onmouseleave="this.classList.remove('active-sugg'); this.style.background=''"
-                         onclick="selectMedicine(this, '${item.name.replace(/'/g, "\\'")}', ${item.selling_price}, ${item.id}, ${item.tablets_per_strip || 0}, ${item.is_unmapped || 0})">
+                         onclick="selectMedicine(this, '${item.name.replace(/'/g, "\\'")}', ${item.selling_price || 0}, ${item.id}, ${item.tablets_per_strip || 0}, 0)">
                         <div style="font-weight:700; color:var(--text-primary); margin-bottom:2px; font-size:0.95em; letter-spacing:0.02em;">
                             ${item.name}
-                            ${item.is_unmapped == 1 ? '<span style="color:var(--danger); font-size:0.85em; margin-left:8px; font-weight:500;">— No Brand Available Yet</span>' : ''}
                         </div>
                         ${item.generic_name ? `<div style="font-size:0.78em; color:#6366f1; font-style:italic; margin-bottom:4px; font-weight:500;">Generic: ${item.generic_name}</div>` : ''}
                         ${item.agency_name ? `<div style="font-size:0.8em; color:var(--text-secondary); margin-bottom:4px;">Agency : ${item.agency_name}</div>` : ''}
