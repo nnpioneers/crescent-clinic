@@ -4611,6 +4611,35 @@ if ($uri === '/api/cron/backup' && $method === 'GET') {
 }
 
 function sync_generic_mappings($conn) {
+    // 0. Auto-cleanup duplicates caused by previous race conditions
+    try {
+        $conn->exec("
+            DELETE gm1 FROM generic_mappings gm1
+            INNER JOIN generic_mappings gm2 
+            WHERE gm1.id > gm2.id 
+              AND TRIM(LOWER(gm1.generic_name)) = TRIM(LOWER(gm2.generic_name))
+              AND TRIM(LOWER(gm1.brand_name)) = TRIM(LOWER(gm2.brand_name))
+        ");
+        $conn->exec("
+            DELETE i1 FROM inventory i1
+            INNER JOIN inventory i2 
+            WHERE i1.id > i2.id 
+              AND TRIM(LOWER(i1.name)) = TRIM(LOWER(i2.name))
+              AND (i1.generic_name = i2.generic_name OR (i1.generic_name IS NULL AND i2.generic_name IS NULL))
+        ");
+        $conn->exec("
+            DELETE ai1 FROM agency_items ai1
+            INNER JOIN agency_items ai2 
+            WHERE ai1.id > ai2.id 
+              AND TRIM(LOWER(ai1.item_name)) = TRIM(LOWER(ai2.item_name))
+              AND (ai1.generic_name = ai2.generic_name OR (ai1.generic_name IS NULL AND ai2.generic_name IS NULL))
+        ");
+        $conn->exec("UPDATE generic_mappings SET batch_number = 'BATCH-01' WHERE batch_number IS NULL OR batch_number = '-'");
+        $conn->exec("UPDATE inventory SET batch_number = 'BATCH-01' WHERE batch_number IS NULL OR batch_number = '-'");
+    } catch (Exception $e) {
+        // Silently ignore cleanup errors
+    }
+
     // 1. Sync from agency_items to generic_mappings
     $conn->exec("
         INSERT INTO generic_mappings (brand_name, batch_number, generic_name, agency_name, stock, mrp, row_location, col_location, purchase_rate, selling_rate, category, pack_size, expiry_date, min_stock)
