@@ -63,15 +63,15 @@ if (!String.prototype.toFixed) {
                 });
 
                 document.addEventListener('click', (e) => {
+                    // Close sidebar if user clicked on a navigation item
+                    if (sidebar.classList.contains('mobile-open') && (e.target.closest('.nav-item') || e.target.closest('.sidebar-nav a') || e.target.closest('.sidebar-nav button'))) {
+                        sidebar.classList.remove('mobile-open');
+                    }
+                    
+                    // Close sidebar if user clicked outside the sidebar and toggle button
                     if (sidebar.classList.contains('mobile-open') && !sidebar.contains(e.target) && e.target !== toggleBtn && !toggleBtn.contains(e.target)) {
                         sidebar.classList.remove('mobile-open');
                     }
-                });
-
-                document.querySelectorAll('.nav-item').forEach(item => {
-                    item.addEventListener('click', () => {
-                        sidebar.classList.remove('mobile-open');
-                    });
                 });
             }
         };
