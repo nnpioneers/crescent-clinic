@@ -1386,8 +1386,13 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
         $filtered_results[] = $r;
     }
 
-    $final_results = array_merge($generic_headers, $filtered_results);
-    
+    // Only include generic headers (standalone generics) in Pharmacy Medicine search
+    if ($category === 'medicine') {
+        $final_results = array_merge($generic_headers, $filtered_results);
+    } else {
+        $final_results = $filtered_results;
+    }
+
     usort($final_results, function($a, $b) {
         $header_a = $a['is_generic_header'] ?? 0;
         $header_b = $b['is_generic_header'] ?? 0;
