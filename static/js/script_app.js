@@ -1161,7 +1161,7 @@ if (!String.prototype.toFixed) {
             </div>
             <div class="form-group" style="margin:0;">
                 <label style="font-size: 0.65rem; color: var(--text-muted); margin-bottom: 2px; display: block;">Total Amount</label>
-                <input type="number" placeholder="0.00" class="med-amount" readonly>
+                <input type="number" placeholder="0.00" class="med-amount" step="0.01" oninput="updateGrandTotal()">
             </div>
             <button class="btn-remove-med" onclick="this.parentElement.remove();updateGrandTotal();" style="margin-bottom: 8px;">✕</button>
         `;
@@ -1635,7 +1635,10 @@ if (!String.prototype.toFixed) {
 
         const amount = (strips * price) + (tablets * tabletPrice);
 
-        row.querySelector('.med-amount').value = amount.toFixed(2);
+        // Only auto-calculate if price > 0, otherwise allow manual entry
+        if (price > 0) {
+            row.querySelector('.med-amount').value = amount.toFixed(2);
+        }
         updateGrandTotal();
     };
 
