@@ -1942,6 +1942,10 @@ if (!String.prototype.toFixed) {
         } catch (err) {
             if (waWin) waWin.close();
             console.error('Save Billing Error:', err);
+        }
+        
+        } catch (outerErr) {
+            console.error('Submit Medicines Error:', outerErr);
         } finally {
             saveBtns.forEach(btn => btn.disabled = false);
         }
