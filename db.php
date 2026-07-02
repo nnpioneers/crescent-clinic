@@ -39,9 +39,24 @@ function get_db()
         $username = getenv('DB_USER') ?: 'u526658771_nnp';
         $password = getenv('DB_PASSWORD') ?: 'Namaraja@4';
 
-        $conn = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
-        $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+        $max_retries = 3;
+        $retry_count = 0;
+        
+        while (true) {
+            try {
+                $conn = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
+                $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+                $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+                break;
+            } catch (PDOException $e) {
+                if ($retry_count < $max_retries && (strpos($e->getMessage(), '2002') !== false || strpos($e->getMessage(), '1040') !== false || strpos($e->getMessage(), 'Operation not permitted') !== false)) {
+                    $retry_count++;
+                    usleep(500000); // 500ms delay
+                } else {
+                    throw $e;
+                }
+            }
+        }
 
         // Auto-initialize if database is empty (check if 'users' table exists)
         $stmt = $conn->query("SHOW TABLES LIKE 'users'");
