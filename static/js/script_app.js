@@ -3556,58 +3556,5 @@ document.addEventListener('click', function (e) {
     }
 });
 
-window.searchAgencyNames = async function (inputEl) {
-    const q = inputEl.value.trim().toLowerCase();
-    let suggBox = inputEl.nextElementSibling;
-    if (!suggBox || !suggBox.classList.contains('agency-suggestions')) {
-        suggBox = document.createElement('div');
-        suggBox.className = 'agency-suggestions';
-        suggBox.style.cssText = "display:none; position:absolute; top:100%; left:0; width:100%; z-index:1000; background:var(--bg-card); border:1px solid var(--border); border-radius:4px; max-height:200px; overflow-y:auto; box-shadow:0 8px 16px rgba(0,0,0,0.5);";
-        inputEl.parentNode.insertBefore(suggBox, inputEl.nextSibling);
-        inputEl.parentNode.style.position = 'relative';
-    }
 
-    if (q.length < 2) {
-        suggBox.style.display = 'none';
-        return;
-    }
 
-    try {
-        const results = await api('/api/agencies/lookup');
-        if (results && results.length > 0) {
-            const filtered = results.filter(name => name.toLowerCase().includes(q));
-            if (filtered.length > 0) {
-                suggBox.innerHTML = filtered.map(name => `
-                    <div class="agency-sugg-item" style="padding:8px 12px; cursor:pointer; border-bottom:1px solid var(--border); transition: background 0.15s; background: var(--bg-card); color: var(--text-primary);"
-                         onmouseenter="this.style.background='var(--bg-hover)'"
-                         onmouseleave="this.style.background='var(--bg-card)'"
-                         onclick="selectAgencyName(this, '${name.replace(/'/g, "\\'")}')">
-                        ${name}
-                    </div>
-                `).join('');
-                suggBox.style.display = 'block';
-            } else {
-                suggBox.style.display = 'none';
-            }
-        } else {
-            suggBox.style.display = 'none';
-        }
-    } catch (e) {
-        console.error(e);
-        suggBox.style.display = 'none';
-    }
-};
-
-window.selectAgencyName = function (itemEl, name) {
-    const inputEl = itemEl.parentNode.previousElementSibling;
-    inputEl.value = name;
-    itemEl.parentNode.style.display = 'none';
-};
-
-document.addEventListener('click', function (e) {
-    if (!e.target.closest('.agency-suggestions') && e.target.id !== 'invAgencyName') {
-        document.querySelectorAll('.agency-suggestions').forEach(box => {
-            box.style.display = 'none';
-        });
-    }
-});

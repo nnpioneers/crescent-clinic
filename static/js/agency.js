@@ -219,7 +219,7 @@ function openAgencySuppModal() {
     if (document.getElementById('agSuppAddress')) document.getElementById('agSuppAddress').value = '';
 
     document.getElementById('agSuppTotalPurch').value = '0';
-    document.querySelector('input[name="agSuppPayStatus"][value="Not Paid"]').checked = true;
+    document.getElementById('agSuppPayStatus').value = 'Not Paid';
     document.getElementById('agSuppPending').value = '0';
     document.getElementById('agSuppPaid').value = '0';
     document.getElementById('agSuppCash').value = '0';
