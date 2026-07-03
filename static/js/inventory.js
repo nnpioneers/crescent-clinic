@@ -389,3 +389,17 @@
         window.loadInventory = loadInventory;
         window.deleteInventory = deleteInventory;
 
+
+
+// Load agencies for autocomplete on startup
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        const agencies = await api('/api/agencies/lookup');
+        const dataList = document.getElementById('agencyList');
+        if (dataList && agencies) {
+            dataList.innerHTML = agencies.map(a => <option value="${a}"></option>).join('');
+        }
+    } catch (e) {
+        console.error('Failed to load agencies for autocomplete', e);
+    }
+});

@@ -3009,6 +3009,37 @@ if (preg_match('/^\/api\/management\/patient\/delete\/(\d+)$/', $uri, $matches))
 // API — AGENCY INVENTORY
 // ═══════════════════════════════════════════
 
+// Agency Autocomplete Lookup
+if ($uri === '/api/agencies/lookup' && $method === 'GET') {
+    enforce_api_auth();
+    $conn = get_db();
+    
+    $agencies = [];
+    
+    // Get distinct from generic_mappings
+    $stmt1 = $conn->query("SELECT DISTINCT agency_name FROM generic_mappings WHERE agency_name IS NOT NULL AND agency_name != ''");
+    while ($row = $stmt1->fetch(PDO::FETCH_ASSOC)) {
+        $agencies[] = trim($row['agency_name']);
+    }
+    
+    // Get distinct from agency_suppliers
+    $stmt2 = $conn->query("SELECT DISTINCT name FROM agency_suppliers WHERE name IS NOT NULL AND name != ''");
+    while ($row = $stmt2->fetch(PDO::FETCH_ASSOC)) {
+        $agencies[] = trim($row['name']);
+    }
+    
+    // Get distinct from inventory
+    $stmt3 = $conn->query("SELECT DISTINCT agency_name FROM inventory WHERE agency_name IS NOT NULL AND agency_name != ''");
+    while ($row = $stmt3->fetch(PDO::FETCH_ASSOC)) {
+        $agencies[] = trim($row['agency_name']);
+    }
+    
+    $agencies = array_values(array_unique(array_filter($agencies)));
+    sort($agencies);
+    
+    json_response($agencies);
+}
+
 // Dashboard
 if ($uri === '/api/agency/dashboard' && $method === 'GET') {
     enforce_api_auth(['pharmacist']);
