@@ -47,6 +47,8 @@ function get_db()
                 $conn = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
                 $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
                 $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+                $conn->setAttribute(PDO::ATTR_AUTOCOMMIT, 1);
+                $conn->exec("SET autocommit=1");
                 break;
             } catch (PDOException $e) {
                 if ($retry_count < $max_retries && (strpos($e->getMessage(), '2002') !== false || strpos($e->getMessage(), '1040') !== false || strpos($e->getMessage(), 'Operation not permitted') !== false)) {
