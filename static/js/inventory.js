@@ -397,25 +397,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const agencies = await api('/api/agencies/lookup');
         const dataList = document.getElementById('agencyList');
         if (dataList && agencies) {
-            dataList.innerHTML = agencies.map(a => <option value="${a}"></option>).join('');
+            dataList.innerHTML = agencies.map(a => `<option value="${a}"></option>`).join('');
         }
     } catch (e) {
         console.error('Failed to load agencies for autocomplete', e);
     }
 });
-// Populate Agency Name select dropdown
-document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        const agencies = await api('/api/agencies/lookup');
-        const selectEl = document.getElementById('invAgencyName');
-        if (selectEl && agencies && Array.isArray(agencies)) {
-            let options = '<option value="">Select Agency</option>';
-            agencies.forEach(a => {
-                options += <option value="$("{a}"})">$("{a}"})</option>;
-            });
-            selectEl.innerHTML = options;
-        }
-    } catch (e) {
-        console.error('Failed to load agencies for select dropdown:', e);
-    }
-});
+
+

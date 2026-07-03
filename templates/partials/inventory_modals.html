@@ -36,13 +36,13 @@
                                 placeholder="Type custom category name..." style="display:none;">
                         </div>
                     </div>
-                      <div class="responsive-grid" style="margin-bottom:0;">
-                          <div class="form-group">
-                              <label>🏢 Agency Name</label>
-                              <select id="invAgencyName" class="form-control">
-                                  <option value="">Select Agency</option>
-                              </select>
-                          </div>
+                    <div class="responsive-grid" style="margin-bottom:0;">
+                        <div class="form-group">
+                            <label>🏢 Agency Name</label>
+                            <div style="position:relative;">
+                                <input type="text" id="invAgencyName" placeholder="e.g. SHANMUGA AGENCY" autocomplete="off" oninput="searchAgencyNames(this)" onfocus="searchAgencyNames(this)" onclick="searchAgencyNames(this)">
+                            </div>
+                        </div>
                     </div>
                     <div class="responsive-grid" style="margin-top:8px;">
                         <div class="form-group">
