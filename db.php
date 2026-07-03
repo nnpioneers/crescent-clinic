@@ -47,7 +47,7 @@ function get_db()
                 $conn = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
                 $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
                 $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
-                $conn->exec("SET autocommit=1");
+                $conn->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, true);
                 break;
             } catch (PDOException $e) {
                 if ($retry_count < $max_retries && (strpos($e->getMessage(), '2002') !== false || strpos($e->getMessage(), '1040') !== false || strpos($e->getMessage(), 'Operation not permitted') !== false)) {
@@ -76,9 +76,11 @@ function get_db()
             try {
                 $q = $conn->query("SHOW COLUMNS FROM inventory");
                 if ($q) {
-                    while ($row = $q->fetch(PDO::FETCH_ASSOC)) {
+                    $all_rows = $q->fetchAll(PDO::FETCH_ASSOC);
+                    foreach ($all_rows as $row) {
                         $existing_cols[] = strtolower($row['Field']);
                     }
+                    $q->closeCursor();
                 }
             } catch (Exception $e) {
                 // Table might not exist yet or other error, fallback to exec with try-catch
@@ -136,9 +138,11 @@ function get_db()
             try {
                 $q = $conn->query("SHOW COLUMNS FROM generic_mappings");
                 if ($q) {
-                    while ($row = $q->fetch(PDO::FETCH_ASSOC)) {
+                    $all_rows = $q->fetchAll(PDO::FETCH_ASSOC);
+                    foreach ($all_rows as $row) {
                         $existing_gm_cols[] = strtolower($row['Field']);
                     }
+                    $q->closeCursor();
                 }
             } catch (Exception $e) {}
 
