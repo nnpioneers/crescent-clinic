@@ -1796,9 +1796,12 @@ let gmSelectedGeneric = ''; // Track currently active generic in detail view
 async function loadGenericMedicines() {
     try {
         // Reset to list view when tab is selected
-        document.getElementById('gmListView').style.display = 'block';
-        document.getElementById('gmDetailView').style.display = 'none';
-        document.getElementById('gmSearchInput').value = '';
+        const listView = document.getElementById('gmListView');
+        const detailView = document.getElementById('gmDetailView');
+        const searchInput = document.getElementById('gmSearchInput');
+        if (listView) listView.style.display = 'block';
+        if (detailView) detailView.style.display = 'none';
+        if (searchInput) searchInput.value = '';
         
         const data = await api('/api/generics/list');
         gmAllData = data || [];
@@ -1806,9 +1809,11 @@ async function loadGenericMedicines() {
         gmCurrentPage = 1;
 
         // Update total stats
-        document.getElementById('gmStatTotal').textContent = gmAllData.length;
+        const statTotal = document.getElementById('gmStatTotal');
+        const statBrands = document.getElementById('gmStatBrands');
         const totalBrands = gmAllData.reduce((acc, row) => acc + parseInt(row.brand_count || 0), 0);
-        document.getElementById('gmStatBrands').textContent = totalBrands;
+        if (statTotal) statTotal.textContent = gmAllData.length;
+        if (statBrands) statBrands.textContent = totalBrands;
 
         renderGmList();
     } catch (e) {
@@ -1900,13 +1905,17 @@ function renderGmList() {
     const end = start + gmPageSize;
     const paginatedItems = gmFilteredData.slice(start, end);
     const tbody = document.getElementById('gmListBody');
+    const statFiltered = document.getElementById('gmStatFiltered');
+    const paginationEl = document.getElementById('gmPagination');
 
     // Update filtered stat
-    document.getElementById('gmStatFiltered').textContent = `${gmFilteredData.length} of ${gmAllData.length}`;
+    if (statFiltered) statFiltered.textContent = `${gmFilteredData.length} of ${gmAllData.length}`;
+
+    if (!tbody) return; // elements not in DOM yet
 
     if (paginatedItems.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:30px; color:var(--text-secondary);">No generic medicines found.</td></tr>`;
-        document.getElementById('gmPagination').innerHTML = '';
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:30px; color:var(--text-secondary);">No items found.</td></tr>`;
+        if (paginationEl) paginationEl.innerHTML = '';
         return;
     }
 
@@ -1934,6 +1943,7 @@ function renderGmList() {
 function renderGmPagination() {
     const totalPages = Math.ceil(gmFilteredData.length / gmPageSize);
     const container = document.getElementById('gmPagination');
+    if (!container) return;
     if (totalPages <= 1) {
         container.innerHTML = '';
         return;
@@ -1967,16 +1977,21 @@ function gmGoToPage(page) {
 async function gmViewBrands(genericName) {
     try {
         gmSelectedGeneric = genericName;
-        document.getElementById('gmListView').style.display = 'none';
-        document.getElementById('gmDetailView').style.display = 'block';
-        document.getElementById('gmDetailGenericName').textContent = genericName;
+        const listViewEl = document.getElementById('gmListView');
+        const detailViewEl = document.getElementById('gmDetailView');
+        const detailNameEl = document.getElementById('gmDetailGenericName');
+        if (listViewEl) listViewEl.style.display = 'none';
+        if (detailViewEl) detailViewEl.style.display = 'block';
+        if (detailNameEl) detailNameEl.textContent = genericName;
         
         const tbody = document.getElementById('gmDetailBody');
+        if (!tbody) return;
         tbody.innerHTML = `<tr><td colspan="12" style="text-align:center; padding:30px; color:var(--text-secondary);">Loading brands…</td></tr>`;
 
         const brands = await api(`/api/generics/brands?generic=${encodeURIComponent(genericName)}`);
         
-        document.getElementById('gmDetailBrandCount').textContent = `${brands.length} brand medicines mapped`;
+        const brandCountEl = document.getElementById('gmDetailBrandCount');
+        if (brandCountEl) brandCountEl.textContent = `${brands.length} brand medicines mapped`;
 
         if (!brands || brands.length === 0) {
             tbody.innerHTML = `<tr><td colspan="12" style="text-align:center; padding:30px; color:var(--text-secondary);">No brands currently mapped to this generic.</td></tr>`;
@@ -2025,8 +2040,10 @@ async function gmViewBrands(genericName) {
 
 // Return from detail view to main paginated list
 function gmBackToList() {
-    document.getElementById('gmListView').style.display = 'block';
-    document.getElementById('gmDetailView').style.display = 'none';
+    const lv = document.getElementById('gmListView');
+    const dv = document.getElementById('gmDetailView');
+    if (lv) lv.style.display = 'block';
+    if (dv) dv.style.display = 'none';
     gmSelectedGeneric = '';
 }
 
@@ -2499,7 +2516,7 @@ async function deleteAgencyFromView(id, name) {
 // NORMAL INVENTORY — Sub-tab switching (Medicines | Items)
 // ═══════════════════════════════════════════════════════════════════
 
-function switchInvTab(tab, btn) {
+window.switchInvTab = function switchInvTab(tab, btn) {
     // Hide all sub-tab panels
     document.querySelectorAll('.inv-subtab-content').forEach(el => el.style.display = 'none');
     // Show selected panel
@@ -2516,12 +2533,12 @@ function switchInvTab(tab, btn) {
 
     // Load data for the selected tab
     if (tab === 'medicines') {
-        loadInventory();
+        if (typeof loadInventory === 'function') loadInventory();
     }
     if (tab === 'items') {
-        loadGenericMedicines();
+        if (typeof loadGenericMedicines === 'function') loadGenericMedicines();
     }
-}
+};
 
 // ═══════════════════════════════════════════════════════════════════
 // ITEMS TAB — Manual "Add Item" (Generic Medicine) creation
