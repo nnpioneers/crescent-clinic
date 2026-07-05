@@ -5576,5 +5576,61 @@ if ($uri === '/api/agency_medicine_list' && $method === 'GET') {
     }
 }
 
+/**
+ * POST /api/generics/add
+ * Body: { generic_name: "Paracetamol" }
+ * Manually creates a single Generic Medicine (Item) entry.
+ * Uses same placeholder-row mechanism as Scenario B in /api/generics/import.
+ */
+if ($uri === '/api/generics/add' && $method === 'POST') {
+    enforce_api_auth(['pharmacist']);
+    $generic = trim($input['generic_name'] ?? '');
+
+    if ($generic === '') {
+        json_response(['error' => 'Item name cannot be empty.'], 400);
+    }
+    if (strlen($generic) <= 2) {
+        json_response(['error' => 'Item name is too short.'], 400);
+    }
+
+    $conn = get_db();
+    try {
+        // Check if a placeholder for this generic already exists
+        $check = $conn->prepare("SELECT COUNT(*) FROM agency_items WHERE TRIM(LOWER(generic_name)) = TRIM(LOWER(?)) AND item_name = '(Unmapped Brand)'");
+        $check->execute([$generic]);
+        if ($check->fetchColumn() > 0) {
+            json_response(['success' => false, 'error' => "Item \"$generic\" already exists."], 409);
+        }
+
+        // Insert placeholder row (same as Scenario B import)
+        $placeholder_batch = 'manual_' . uniqid() . '_' . substr(md5($generic), 0, 8);
+        $stmt = $conn->prepare("
+            INSERT INTO agency_items
+                (item_name, generic_name, batch_number, stock, mrp, category, brand_name)
+            VALUES ('(Unmapped Brand)', ?, ?, 0, 0.00, 'TAB', '(Unmapped Brand)')
+        ");
+        $stmt->execute([$generic, $placeholder_batch]);
+
+        // Audit trail
+        $conn->prepare("
+            INSERT INTO agency_audit_trail
+                (user_id, action, table_name, record_id, old_value, new_value, details)
+            VALUES (?, 'GENERIC_ADD', 'agency_items', ?, '', ?, ?)
+        ")->execute([
+            $_SESSION['user_id'] ?? 0,
+            $conn->lastInsertId(),
+            $generic,
+            "Manually added generic medicine: $generic"
+        ]);
+
+        json_response([
+            'success' => true,
+            'message' => "Item \"$generic\" added successfully."
+        ]);
+    } catch (Exception $e) {
+        json_response(['success' => false, 'error' => $e->getMessage()], 500);
+    }
+}
+
 // 404 for API
 json_response(['error' => 'API Endpoint not found'], 404);

@@ -19,7 +19,6 @@ function switchAgencyTab(tab, btn) {
     if (tab === 'purchases') { loadAgencySuppliersForSelect(); loadAgencyPurchases(); }
     if (tab === 'stock') loadAgencyItemsForSelect();
     if (tab === 'reports') loadAgencyReports();
-    if (tab === 'generics') loadGenericMedicines();
     if (tab === 'agencies-view') loadAgencyAgenciesView();
 }
 
@@ -2495,3 +2494,66 @@ async function deleteAgencyFromView(id, name) {
         if (e.message) toast(e.message, 'error'); else toast('Failed to delete agency', 'error');
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// NORMAL INVENTORY — Sub-tab switching (Medicines | Items)
+// ═══════════════════════════════════════════════════════════════════
+
+function switchInvTab(tab, btn) {
+    // Hide all sub-tab panels
+    document.querySelectorAll('.inv-subtab-content').forEach(el => el.style.display = 'none');
+    // Show selected panel
+    const panel = document.getElementById('inv-' + tab);
+    if (panel) panel.style.display = 'block';
+
+    // Update tab button active state
+    document.querySelectorAll('#invSubTabs .btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+
+    // Show/hide the "Add New Medicine / Batch" button (only relevant for Medicines tab)
+    const addMedBtn = document.getElementById('invAddMedBtn');
+    if (addMedBtn) addMedBtn.style.display = (tab === 'medicines') ? '' : 'none';
+
+    // Load data for the selected tab
+    if (tab === 'medicines') {
+        loadInventory();
+    }
+    if (tab === 'items') {
+        loadGenericMedicines();
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ITEMS TAB — Manual "Add Item" (Generic Medicine) creation
+// ═══════════════════════════════════════════════════════════════════
+
+window.openAddGenericItemModal = function() {
+    const input = document.getElementById('gmAddItemName');
+    if (input) input.value = '';
+    openModal('gmAddItemModal');
+    setTimeout(() => { if (input) input.focus(); }, 100);
+};
+
+window.gmSaveNewItem = async function() {
+    const nameEl = document.getElementById('gmAddItemName');
+    const name = (nameEl ? nameEl.value : '').trim();
+    if (!name) {
+        toast('Please enter an item name.', 'error');
+        return;
+    }
+    try {
+        const res = await api('/api/generics/add', {
+            method: 'POST',
+            body: { generic_name: name }
+        });
+        if (res.success) {
+            toast(res.message || 'Item added successfully!', 'success');
+            closeModal('gmAddItemModal');
+            loadGenericMedicines();
+        } else {
+            toast(res.error || 'Failed to add item.', 'error');
+        }
+    } catch (e) {
+        toast(e.message || 'Failed to add item.', 'error');
+    }
+};
