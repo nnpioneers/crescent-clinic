@@ -1318,14 +1318,6 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     $stmt->execute($params);
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Find all distinct generic names matching the search
-    $distinct_generics = [];
-    foreach ($results as $r) {
-        if (!empty($r['generic_name'])) {
-            $distinct_generics[$r['generic_name']] = 1;
-        }
-    }
-
     $gm_conditions = [];
     $gm_params = [];
     if ($q) {
@@ -1345,24 +1337,21 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     if ($gm_conditions) {
         $gm_query .= " WHERE " . implode(" AND ", $gm_conditions);
     }
+    $gm_query .= " ORDER BY generic_name ASC LIMIT 30";
+    
     $stmt2 = $conn->prepare($gm_query);
     $stmt2->execute($gm_params);
     $gm_generics = $stmt2->fetchAll(PDO::FETCH_COLUMN);
 
-    foreach ($gm_generics as $g_name) {
-        if (!empty($g_name)) {
-            $distinct_generics[$g_name] = 1;
-        }
-    }
-
-    $generic_headers = [];
+    $final_results = [];
     $stmt_count = $conn->prepare("SELECT COUNT(*) FROM inventory WHERE generic_name = ? AND name != '(Unmapped Brand)' AND batch_number NOT LIKE 'ph_%'");
     
-    foreach (array_keys($distinct_generics) as $g_name) {
+    foreach ($gm_generics as $g_name) {
+        if (empty($g_name)) continue;
         $stmt_count->execute([$g_name]);
         $brand_count = (int)$stmt_count->fetchColumn();
 
-        $generic_headers[] = [
+        $final_results[] = [
             'id' => -1 * abs(crc32($g_name)),
             'name' => $g_name,
             'generic_name' => $g_name,
@@ -1374,21 +1363,20 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
         ];
     }
 
-    $filtered_results = [];
-    foreach ($results as $r) {
-        if (strpos($r['batch_number'], 'ph_') === 0 || strtolower($r['brand_name']) === '(unmapped brand)' || strtolower($r['name']) === '(unmapped brand)') {
-            continue;
+    // Load matching batches directly if search is empty or we want to populate the sub-results
+    if ($q) {
+        $brand_query = "SELECT i.*, COALESCE(NULLIF(i.agency_name,''), s.name) as agency_name FROM inventory i LEFT JOIN agency_suppliers s ON i.supplier_id = s.id WHERE i.generic_name IN (SELECT DISTINCT generic_name FROM generic_mappings WHERE generic_name LIKE ?)";
+        $stmt_brands = $conn->prepare($brand_query);
+        $stmt_brands->execute(["%$q%"]);
+        $brand_batches = $stmt_brands->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($brand_batches as $r) {
+            if (strpos($r['batch_number'], 'ph_') === 0 || strtolower($r['brand_name']) === '(unmapped brand)' || strtolower($r['name']) === '(unmapped brand)') {
+                continue;
+            }
+            $r['is_unmapped'] = 0;
+            $r['is_generic_header'] = 0;
+            $final_results[] = $r;
         }
-        $r['is_unmapped'] = 0;
-        $r['is_generic_header'] = 0;
-        $filtered_results[] = $r;
-    }
-
-    // Only include generic headers (standalone generics) in Pharmacy Medicine search
-    if ($category === 'medicine') {
-        $final_results = array_merge($generic_headers, $filtered_results);
-    } else {
-        $final_results = $filtered_results;
     }
 
     usort($final_results, function($a, $b) {
