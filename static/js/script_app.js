@@ -1311,12 +1311,24 @@ if (!String.prototype.toFixed) {
                 };
             });
             if (items.length > 0) {
-                suggBox.innerHTML = items.map((item, idx) => {
+                const renderSuggItem = (item, isFirst, isAddNewBrand, isWithoutBrand) => {
                     const expText = item.expiry_date || 'N/A';
                     const batchLabel = item.batch_number || '-';
                     const stockWarn = item.stock <= (item.min_stock || 0) ? ' ⚠️ LOW' : '';
-                    const activeStyle = idx === 0 ? 'background:var(--bg-hover);' : '';
-                    const activeClass = idx === 0 ? 'active-sugg' : '';
+                    const activeStyle = isFirst ? 'background:var(--bg-hover);' : '';
+                    const activeClass = isFirst ? 'active-sugg' : '';
+
+                    if (isAddNewBrand) {
+                        return `
+                        <div class="med-sugg-item ${activeClass}" style="padding:12px; cursor:pointer; border-bottom:1px solid var(--border); transition: background 0.15s; ${activeStyle}" 
+                             onmouseenter="this.parentElement.querySelectorAll('.med-sugg-item').forEach(i => {i.classList.remove('active-sugg'); i.style.background=''}); this.classList.add('active-sugg'); this.style.background='var(--bg-hover)';"
+                             onmouseleave="this.classList.remove('active-sugg'); this.style.background=''"
+                             onclick="selectMedicine(this, '${item.name.replace(/'/g, "\\'")}', ${item.selling_price || 0}, ${item.id}, ${item.tablets_per_strip || 0}, 1)">
+                            <div style="font-weight:600; color:#3b82f6; font-size:0.95em;">
+                                + Add New Brand
+                            </div>
+                        </div>`;
+                    }
 
                     let cat = (item.category || '').toUpperCase();
                     let nameUpper = (item.name || '').toUpperCase();
@@ -1333,8 +1345,6 @@ if (!String.prototype.toFixed) {
 
                     let matchVolume = item.name.match(/(\d+(\.\d+)?\s*(ml|l|gm|mg|kg|oz))/i);
                     let extText = matchVolume ? matchVolume[0] : 'N/A';
-
-                    let showDynamic = true;
 
                     if (isTablet) {
                         let tps = parseInt(item.tablets_per_strip) || 1;
@@ -1369,44 +1379,23 @@ if (!String.prototype.toFixed) {
                         if (!pluralCat.toLowerCase().endsWith('s')) {
                             pluralCat += 's';
                         }
-
                         priceLabel = `MRP : ₹${parseFloat(item.mrp || item.selling_price || 0).toFixed(2)} / ${catName}`;
                         stockLabel = `Stock : ${item.stock} ${pluralCat}${stockWarn}`;
                         extraLabel = `Pack : ${item.tablets_per_strip || 1} ${pluralCat} / Pack`;
                     }
 
-                    if (item.is_unmapped == 1) {
-                        return `
-                        <!-- Generic Header (Non-selectable) -->
-                        <div style="padding:8px 12px 4px 12px; border-bottom:none; background:var(--bg-surface); cursor:default;">
-                            <div style="font-weight:700; color:var(--text-primary); margin-bottom:2px; font-size:0.95em; letter-spacing:0.02em;">
-                                ${item.name}
-                            </div>
-                            <div style="font-size:0.78em; color:#6366f1; font-style:italic; margin-bottom:4px; font-weight:500;">Generic Medicine</div>
-                            <div style="font-size:0.85em; font-weight:500; color:var(--text-secondary); margin-top:2px;">Brands Mapped: ${item.brand_count !== undefined ? item.brand_count : 0}</div>
-                        </div>
-                        <!-- Add New Brand Option (Selectable) -->
-                        <div class="med-sugg-item ${activeClass}" style="padding:10px 12px 10px 24px; cursor:pointer; border-bottom:1px solid var(--border); transition: background 0.15s; ${activeStyle}" 
-                             onmouseenter="this.parentElement.querySelectorAll('.med-sugg-item').forEach(i => {i.classList.remove('active-sugg'); i.style.background=''}); this.classList.add('active-sugg'); this.style.background='var(--bg-hover)';"
-                             onmouseleave="this.classList.remove('active-sugg'); this.style.background=''"
-                             onclick="selectMedicine(this, '${item.name.replace(/'/g, "\\'")}', ${item.selling_price || 0}, ${item.id}, ${item.tablets_per_strip || 0}, 1)">
-                            <div style="font-weight:600; color:#3b82f6; font-size:0.95em;">
-                                <span style="color:var(--text-secondary); margin-right:4px;">├──</span> + Add New Brand
-                            </div>
-                        </div>`;
-                    }
+                    let bullet = isWithoutBrand ? '' : '• ';
 
                     return `
-                    <div class="med-sugg-item ${activeClass}" style="padding:10px 12px 10px 24px; cursor:pointer; border-bottom:1px solid var(--border); transition: background 0.15s; ${activeStyle}" 
+                    <div class="med-sugg-item ${activeClass}" style="padding:10px 12px; cursor:pointer; border-bottom:1px solid var(--border); transition: background 0.15s; ${activeStyle}" 
                          onmouseenter="this.parentElement.querySelectorAll('.med-sugg-item').forEach(i => {i.classList.remove('active-sugg'); i.style.background=''}); this.classList.add('active-sugg'); this.style.background='var(--bg-hover)';"
                          onmouseleave="this.classList.remove('active-sugg'); this.style.background=''"
                          onclick="selectMedicine(this, '${item.name.replace(/'/g, "\\'")}', ${item.selling_price || 0}, ${item.id}, ${item.tablets_per_strip || 0}, 0)">
                         <div style="font-weight:700; color:var(--text-primary); margin-bottom:2px; font-size:0.95em; letter-spacing:0.02em;">
-                            <span style="color:var(--text-secondary); font-weight:normal; margin-right:4px;">├──</span> ${item.name}
+                            <span style="color:var(--text-secondary); font-weight:normal; margin-right:4px;">${bullet}</span>${item.name}
                         </div>
-                        ${item.generic_name ? `<div style="font-size:0.78em; color:#6366f1; font-style:italic; margin-bottom:4px; font-weight:500; margin-left: 20px;">Generic: ${item.generic_name}</div>` : ''}
-                        ${item.agency_name ? `<div style="font-size:0.8em; color:var(--text-secondary); margin-bottom:4px; margin-left: 20px;">Agency : ${item.agency_name}</div>` : ''}
-                        <div style="font-size:0.8em; color:var(--text-secondary); margin-bottom:4px; display:flex; flex-direction:column; gap:2px; margin-left: 20px;">
+                        ${item.agency_name ? `<div style="font-size:0.8em; color:var(--text-secondary); margin-bottom:4px; margin-left: ${isWithoutBrand ? '0' : '12px'};">Agency : ${item.agency_name}</div>` : ''}
+                        <div style="font-size:0.8em; color:var(--text-secondary); margin-bottom:4px; display:flex; flex-direction:column; gap:2px; margin-left: ${isWithoutBrand ? '0' : '12px'};">
                             <span>Batch No : ${batchLabel}</span>
                             <span>Expiry : ${expText}</span>
                         </div>
@@ -1418,7 +1407,42 @@ if (!String.prototype.toFixed) {
                             ${item.col_location ? `<span>Column : ${item.col_location}</span>` : ''}
                         </div>
                     </div>`;
-                }).join('');
+                };
+
+                let groupedItems = {};
+                items.forEach(item => {
+                    let gName = item.generic_name || item.name;
+                    if (!groupedItems[gName]) groupedItems[gName] = [];
+                    groupedItems[gName].push(item);
+                });
+
+                let html = '';
+                let idx = 0;
+                for (let gName in groupedItems) {
+                    let group = groupedItems[gName];
+                    let withoutBrandItem = group.find(i => i.is_actual_without_brand == 1);
+                    let unmappedPlaceholder = group.find(i => i.is_unmapped == 1);
+                    let brandItems = group.filter(i => i.is_actual_without_brand != 1 && i.is_unmapped != 1);
+
+                    if (withoutBrandItem) {
+                        html += renderSuggItem(withoutBrandItem, idx === 0, false, true);
+                        idx++;
+                    }
+                    
+                    if (brandItems.length > 0) {
+                        html += `<div style="font-weight:bold; color:var(--text-secondary); font-size:0.85em; padding: 12px 12px 4px 12px; border-bottom:1px solid var(--border); background:var(--bg-surface); cursor:default;">Available Brands</div>`;
+                        brandItems.forEach(b => {
+                            html += renderSuggItem(b, idx === 0, false, false);
+                            idx++;
+                        });
+                    }
+                    
+                    if (unmappedPlaceholder) {
+                        html += renderSuggItem(unmappedPlaceholder, idx === 0, true, false);
+                        idx++;
+                    }
+                }
+                suggBox.innerHTML = html;
                 suggBox.style.display = 'block';
             } else {
                 suggBox.style.display = 'none';
