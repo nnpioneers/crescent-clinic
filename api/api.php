@@ -4912,7 +4912,7 @@ if ($uri === '/api/generics/brands' && $method === 'GET') {
                 UNION ALL
                 
                 SELECT
-                    gm.generic_name || ' (Sold Without Brand)' as brand_name,
+                    CONCAT(gm.generic_name, ' (Without Brand)') as brand_name,
                     gm.generic_name,
                     gm.category,
                     gm.batch_number,
