@@ -1370,8 +1370,11 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
         $stmt_brands->execute(["%$q%"]);
         $brand_batches = $stmt_brands->fetchAll(PDO::FETCH_ASSOC);
         foreach ($brand_batches as $r) {
-            if (strpos($r['batch_number'], 'ph_') === 0 || strtolower($r['brand_name']) === '(unmapped brand)' || strtolower($r['name']) === '(unmapped brand)') {
-                continue;
+            if (strpos($r['batch_number'], 'ph_') === 0 || strtolower($r['brand_name']) === '(unmapped brand)' || strtolower($r['name']) === '(unmapped brand)' || strtolower($r['name']) === strtolower($r['generic_name'])) {
+                $r['name'] = $r['generic_name'] . ' (Without Brand)';
+                $r['is_actual_without_brand'] = 1;
+            } else {
+                $r['is_actual_without_brand'] = 0;
             }
             $r['is_unmapped'] = 0;
             $r['is_generic_header'] = 0;
@@ -1393,6 +1396,12 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
         $unmap_b = $b['is_unmapped'] ?? 0;
         if ($unmap_a !== $unmap_b) {
             return $unmap_b - $unmap_a; // 1 before 0
+        }
+        
+        $actual_unmap_a = $a['is_actual_without_brand'] ?? 0;
+        $actual_unmap_b = $b['is_actual_without_brand'] ?? 0;
+        if ($actual_unmap_a !== $actual_unmap_b) {
+            return $actual_unmap_b - $actual_unmap_a; // 1 before 0
         }
 
         return strcmp($a['name'], $b['name']);

@@ -1377,6 +1377,7 @@ if (!String.prototype.toFixed) {
 
                     if (item.is_unmapped == 1) {
                         return `
+                        <!-- Generic Header (Non-selectable) -->
                         <div style="padding:8px 12px 4px 12px; border-bottom:none; background:var(--bg-surface); cursor:default;">
                             <div style="font-weight:700; color:var(--text-primary); margin-bottom:2px; font-size:0.95em; letter-spacing:0.02em;">
                                 ${item.name}
@@ -1384,12 +1385,13 @@ if (!String.prototype.toFixed) {
                             <div style="font-size:0.78em; color:#6366f1; font-style:italic; margin-bottom:4px; font-weight:500;">Generic Medicine</div>
                             <div style="font-size:0.85em; font-weight:500; color:var(--text-secondary); margin-top:2px;">Brands Mapped: ${item.brand_count !== undefined ? item.brand_count : 0}</div>
                         </div>
+                        <!-- Add New Brand Option (Selectable) -->
                         <div class="med-sugg-item ${activeClass}" style="padding:10px 12px 10px 24px; cursor:pointer; border-bottom:1px solid var(--border); transition: background 0.15s; ${activeStyle}" 
                              onmouseenter="this.parentElement.querySelectorAll('.med-sugg-item').forEach(i => {i.classList.remove('active-sugg'); i.style.background=''}); this.classList.add('active-sugg'); this.style.background='var(--bg-hover)';"
                              onmouseleave="this.classList.remove('active-sugg'); this.style.background=''"
                              onclick="selectMedicine(this, '${item.name.replace(/'/g, "\\'")}', ${item.selling_price || 0}, ${item.id}, ${item.tablets_per_strip || 0}, 1)">
-                            <div style="font-weight:600; color:var(--text-primary); font-size:0.95em;">
-                                <span style="color:var(--text-secondary); margin-right:4px;">├──</span> ${item.name} <span style="font-size:0.85em; color:#10b981; font-style:italic; font-weight:500;">(Without Brand)</span>
+                            <div style="font-weight:600; color:#3b82f6; font-size:0.95em;">
+                                <span style="color:var(--text-secondary); margin-right:4px;">├──</span> + Add New Brand
                             </div>
                         </div>`;
                     }
