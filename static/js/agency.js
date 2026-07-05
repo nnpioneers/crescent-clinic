@@ -692,10 +692,9 @@ function addAgPurcRow(item = {}, skipCalc = true) {
 
     tr.innerHTML = `
         <td><input type="text" class="form-control purc-hsn" style="min-width:150px; box-sizing:border-box;" value="${item.hsn_code ?? ''}"></td>
-        <td><input type="text" class="form-control purc-name" style="min-width:350px; box-sizing:border-box;" value="${item.item_name ?? ''}"></td>
         <td>
             <div style="position:relative;">
-                <input type="text" class="form-control purc-generic" style="min-width:250px; box-sizing:border-box;" placeholder="Generic Medicine Name" value="${item.generic_name ?? ''}" autocomplete="off" oninput="searchGenericNames(this)">
+                <input type="text" class="form-control purc-name" style="min-width:350px; box-sizing:border-box;" value="${item.item_name ?? ''}" autocomplete="off" oninput="searchGenericNames(this)">
             </div>
         </td>
         <td><input type="text" class="form-control purc-batch" style="min-width:120px; box-sizing:border-box;" value="${item.batch_number ?? ''}"></td>
@@ -747,7 +746,7 @@ async function saveAgencyPurc() {
         items.push({
             hsn_code: tr.querySelector('.purc-hsn') ? tr.querySelector('.purc-hsn').value : '',
             item_name: name,
-            generic_name: tr.querySelector('.purc-generic') ? tr.querySelector('.purc-generic').value.trim() : '',
+            generic_name: '',
             brand_name: name,
             batch_number: tr.querySelector('.purc-batch').value,
             mfg_date: tr.querySelector('.purc-mfg') ? tr.querySelector('.purc-mfg').value : '',

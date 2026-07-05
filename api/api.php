@@ -1266,13 +1266,11 @@ if ($uri === '/api/generics/search' && $method === 'GET') {
     
     try {
         $stmt = $conn->prepare("
-            SELECT DISTINCT generic_name FROM (
-                SELECT generic_name FROM inventory WHERE generic_name LIKE ? AND generic_name != '' AND generic_name IS NOT NULL
-                UNION
-                SELECT generic_name FROM agency_items WHERE generic_name LIKE ? AND generic_name != '' AND generic_name IS NOT NULL
-            ) AS combined ORDER BY generic_name ASC LIMIT 15
+            SELECT DISTINCT generic_name FROM generic_mappings 
+            WHERE generic_name LIKE ? AND generic_name != '' AND generic_name IS NOT NULL
+            ORDER BY generic_name ASC LIMIT 15
         ");
-        $stmt->execute(["%$q%", "%$q%"]);
+        $stmt->execute(["%$q%"]);
         $results = $stmt->fetchAll(PDO::FETCH_COLUMN);
         json_response($results);
     } catch (Exception $e) {
@@ -3529,10 +3527,7 @@ if ($uri === '/api/agency/purchase/add' && $method === 'POST') {
 
         foreach ($data['items'] as $item) {
             $item_id = $item['item_id'] ?? null;
-            $item_generic = trim($item['generic_name'] ?? '');
-            if ($item_generic === '') {
-                $item_generic = get_mapped_generic_name($conn, $item['item_name'] ?? '');
-            }
+            $item_generic = trim($item['item_name'] ?? '');
             
             if (!$item_id) {
                 $check = $conn->prepare("SELECT id FROM agency_items WHERE item_name = ? AND batch_number = ?");
