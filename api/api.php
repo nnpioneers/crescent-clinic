@@ -1380,11 +1380,21 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     }
 
     usort($final_results, function($a, $b) {
+        $gen_cmp = strcmp(strtolower($a['generic_name'] ?? ''), strtolower($b['generic_name'] ?? ''));
+        if ($gen_cmp !== 0) return $gen_cmp;
+
         $header_a = $a['is_generic_header'] ?? 0;
         $header_b = $b['is_generic_header'] ?? 0;
         if ($header_a !== $header_b) {
             return $header_b - $header_a; // 1 before 0
         }
+
+        $unmap_a = $a['is_unmapped'] ?? 0;
+        $unmap_b = $b['is_unmapped'] ?? 0;
+        if ($unmap_a !== $unmap_b) {
+            return $unmap_b - $unmap_a; // 1 before 0
+        }
+
         return strcmp($a['name'], $b['name']);
     });
     
