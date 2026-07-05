@@ -1424,13 +1424,23 @@ if (!String.prototype.toFixed) {
                     let unmappedPlaceholder = group.find(i => i.is_unmapped == 1);
                     let brandItems = group.filter(i => i.is_actual_without_brand != 1 && i.is_unmapped != 1);
 
+                    if (unmappedPlaceholder) {
+                        html += `
+                        <div style="padding:10px 12px 6px 12px; border-bottom:none; background:var(--bg-surface); cursor:default;">
+                            <div style="font-weight:700; color:var(--text-primary); margin-bottom:2px; font-size:1em; letter-spacing:0.02em;">
+                                ${unmappedPlaceholder.name}
+                            </div>
+                            <div style="font-size:0.8em; color:#6366f1; font-style:italic; margin-bottom:4px; font-weight:600;">Item Medicine</div>
+                            <div style="font-size:0.85em; font-weight:500; color:var(--text-secondary); margin-top:2px;">Brands Available: ${unmappedPlaceholder.brand_count !== undefined ? unmappedPlaceholder.brand_count : 0}</div>
+                        </div>`;
+                    }
+
                     if (withoutBrandItem) {
                         html += renderSuggItem(withoutBrandItem, idx === 0, false, true);
                         idx++;
                     }
                     
                     if (brandItems.length > 0) {
-                        html += `<div style="font-weight:bold; color:var(--text-secondary); font-size:0.85em; padding: 12px 12px 4px 12px; border-bottom:1px solid var(--border); background:var(--bg-surface); cursor:default;">Available Brands</div>`;
                         brandItems.forEach(b => {
                             html += renderSuggItem(b, idx === 0, false, false);
                             idx++;
@@ -1438,8 +1448,7 @@ if (!String.prototype.toFixed) {
                     }
                     
                     if (unmappedPlaceholder) {
-                        html += renderSuggItem(unmappedPlaceholder, idx === 0, true, false);
-                        idx++;
+                        html += renderSuggItem(unmappedPlaceholder, false, true, false);
                     }
                 }
                 suggBox.innerHTML = html;
