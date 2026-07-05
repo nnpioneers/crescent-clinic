@@ -10,7 +10,7 @@ if (session_status() === PHP_SESSION_NONE) {
     ini_set('session.use_only_cookies', 1);
     ini_set('session.cookie_samesite', 'Lax');
 
-    require_once __DIR__ . '/session_handler.php';
+    require_once __DIR__ . '/app/Core/session_handler.php';
     
     // Warm/cold start checks: Ensure all tables exist, if not, initialize them
     try {
