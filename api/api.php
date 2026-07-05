@@ -5,6 +5,23 @@ date_default_timezone_set('Asia/Kolkata');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Cache-Control: post-check=0, pre-check=0', false);
 header('Pragma: no-cache');
+
+// Allow Clinic WiFi IPs for CORS
+$allowed_origins = [
+    'http://192.168.1.5', 'https://192.168.1.5', 
+    'http://38.134.139.118', 'https://38.134.139.118',
+    'http://192.168.1.5:8005'
+];
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+if (in_array($origin, $allowed_origins)) {
+    header("Access-Control-Allow-Origin: $origin");
+    header("Access-Control-Allow-Credentials: true");
+    header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+    header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-CSRF-Token");
+    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+        exit(0);
+    }
+}
 /**
  * API Endpoints (PHP Version)
  */
