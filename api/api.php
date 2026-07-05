@@ -1395,6 +1395,7 @@ if ($uri === '/api/inventory/add' && $method === 'POST') {
     enforce_api_auth(['pharmacist']);
     $conn = get_db();
     $name = trim($input['name'] ?? '');
+    $name = trim(str_ireplace([' (Without Brand)', ' (Sold Without Brand)'], '', $name));
     $batch_number = trim($input['batch_number'] ?? 'BATCH-01');
     $stock = (int)($input['stock'] ?? 0);
     $purchase_price = (float)($input['purchase_price'] ?? $input['cost_price'] ?? 0);
@@ -1414,6 +1415,7 @@ if ($uri === '/api/inventory/add' && $method === 'POST') {
         $generic_name = get_mapped_generic_name($conn, $name);
     }
     $brand_name = trim($input['brand_name'] ?? $name);
+    $brand_name = trim(str_ireplace([' (Without Brand)', ' (Sold Without Brand)'], '', $brand_name));
     $agency_name = trim($input['agency_name'] ?? '');
 
     $supplier_id = null;
@@ -1512,6 +1514,7 @@ if ($uri === '/api/inventory/update' && $method === 'POST') {
         json_response(['success' => false, 'error' => 'Item ID is required for update'], 400);
     }
     $name = trim($input['name'] ?? '');
+    $name = trim(str_ireplace([' (Without Brand)', ' (Sold Without Brand)'], '', $name));
     $batch_number = trim($input['batch_number'] ?? '');
     $stock = (int)($input['stock'] ?? 0);
     $purchase_price = (float)($input['purchase_price'] ?? 0);
@@ -1531,6 +1534,7 @@ if ($uri === '/api/inventory/update' && $method === 'POST') {
         $generic_name = get_mapped_generic_name($conn, $name);
     }
     $brand_name = trim($input['brand_name'] ?? '');
+    $brand_name = trim(str_ireplace([' (Without Brand)', ' (Sold Without Brand)'], '', $brand_name));
     $agency_name = trim($input['agency_name'] ?? '');
 
     $supplier_id = null;
@@ -4931,7 +4935,7 @@ if ($uri === '/api/generics/brands' && $method === 'GET') {
                     i.purchase_price,
                     i.selling_price
                 FROM generic_mappings gm
-                LEFT JOIN inventory i ON TRIM(LOWER(i.name)) = TRIM(LOWER(gm.brand_name)) AND TRIM(LOWER(i.batch_number)) = TRIM(LOWER(gm.batch_number))
+                LEFT JOIN inventory i ON TRIM(LOWER(i.name)) = TRIM(LOWER(gm.generic_name)) AND TRIM(LOWER(i.batch_number)) = TRIM(LOWER(gm.batch_number))
                 WHERE TRIM(LOWER(gm.generic_name)) = TRIM(LOWER(?))
                   AND LOWER(gm.brand_name) = '(unmapped brand)'
                   
