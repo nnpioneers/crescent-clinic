@@ -3549,7 +3549,7 @@ window.selectGenericName = function (itemEl, name) {
 };
 
 document.addEventListener('click', function (e) {
-    if (!e.target.closest('.generic-suggestions') && !e.target.classList.contains('purc-generic') && e.target.id !== 'agItemGeneric' && e.target.id !== 'invGenericName') {
+    if (!e.target.closest('.generic-suggestions') && !e.target.classList.contains('purc-generic') && !e.target.classList.contains('purc-name') && e.target.id !== 'agItemGeneric' && e.target.id !== 'invGenericName') {
         document.querySelectorAll('.generic-suggestions').forEach(box => {
             box.style.display = 'none';
         });
