@@ -7,7 +7,7 @@ ini_set('display_errors', 0);
 
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../auth.php';
-require_once __DIR__ . '/../template_parser.php';
+require_once __DIR__ . '/../app/Core/template_parser.php';
 
 // Schema initialization has been delegated to explicit admin endpoints or CLI
 // to prevent Turso/SQLite latency spikes on every Vercel serverless HTTP request.

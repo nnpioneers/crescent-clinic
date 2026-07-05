@@ -2756,7 +2756,7 @@ if (preg_match('/^\/api\/whatsapp_link\/(\d+)$/', $uri, $matches)) {
 
 if (preg_match('/^\/api\/generate_pdf\/(\d+)$/', $uri, $matches)) {
     enforce_api_auth(['doctor', 'pharmacist']);
-    require_once __DIR__ . '/../pdf_gen.php';
+    require_once __DIR__ . '/../app/Services/pdf_gen.php';
     $presc_id = $matches[1];
     $pdf_content = generate_prescription_pdf($presc_id);
     
@@ -4616,7 +4616,7 @@ if ($uri === '/api/upi_accounts/delete' && $method === 'POST') {
 // API — VERCEL CRON
 // ═══════════════════════════════════════════
 if ($uri === '/api/cron/backup' && $method === 'GET') {
-    require_once __DIR__ . '/../cron_backup.php';
+    require_once __DIR__ . '/../app/Services/cron_backup.php';
     
     // Verify Vercel Cron Secret
     $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';

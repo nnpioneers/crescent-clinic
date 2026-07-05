@@ -3,7 +3,7 @@
  * WhatsApp Sending Service Integration
  */
 
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/../../db.php';
 
 function send_whatsapp_pdf($to, $pdf_content, $filename, $text = '') {
     $conn = get_db();

@@ -4,8 +4,8 @@
  * Replicates the ReportLab layout from app.py
  */
 
-require_once __DIR__ . '/fpdf_lib/fpdf186/fpdf.php';
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/../../fpdf_lib/fpdf186/fpdf.php';
+require_once __DIR__ . '/../../db.php';
 
 class PrescriptionPDF extends FPDF {
     protected $patientData;

@@ -4,7 +4,7 @@
  */
 date_default_timezone_set('Asia/Kolkata');
 
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/../../db.php';
 require_once __DIR__ . '/report_pdf_gen.php';
 require_once __DIR__ . '/whatsapp_service.php';
 

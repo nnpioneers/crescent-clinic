@@ -18,7 +18,7 @@ if (file_exists($env_path)) {
     }
 }
 
-require_once __DIR__ . '/supabase_storage.php';
+require_once __DIR__ . '/app/Services/supabase_storage.php';
 
 if (file_exists(__DIR__ . '/vendor/autoload.php')) {
     require_once __DIR__ . '/vendor/autoload.php';

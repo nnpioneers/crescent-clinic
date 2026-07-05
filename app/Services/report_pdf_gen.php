@@ -3,8 +3,8 @@
  * Master Report PDF Generation using FPDF
  */
 
-require_once __DIR__ . '/fpdf_lib/fpdf186/fpdf.php';
-require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/../../fpdf_lib/fpdf186/fpdf.php';
+require_once __DIR__ . '/../../db.php';
 require_once __DIR__ . '/supabase_storage.php';
 
 class MasterReportPDF extends FPDF {
