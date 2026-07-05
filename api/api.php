@@ -4908,9 +4908,36 @@ if ($uri === '/api/generics/brands' && $method === 'GET') {
                 LEFT JOIN inventory i ON TRIM(LOWER(i.name)) = TRIM(LOWER(gm.brand_name)) AND TRIM(LOWER(i.batch_number)) = TRIM(LOWER(gm.batch_number))
                 WHERE TRIM(LOWER(gm.generic_name)) = TRIM(LOWER(?))
                   AND LOWER(gm.brand_name) != '(unmapped brand)'
-                ORDER BY gm.brand_name ASC, gm.batch_number ASC
+                
+                UNION ALL
+                
+                SELECT
+                    'Direct Item Sales (Sold Without Brand)' as brand_name,
+                    gm.generic_name,
+                    gm.category,
+                    gm.batch_number,
+                    gm.expiry_date,
+                    gm.mrp,
+                    gm.stock,
+                    gm.agency_name as supplier_name,
+                    gm.row_location,
+                    gm.col_location,
+                    gm.pack_size,
+                    gm.min_stock,
+                    i.id as inventory_id,
+                    i.item_code,
+                    i.hsn_code,
+                    i.mfg_date,
+                    i.purchase_price,
+                    i.selling_price
+                FROM generic_mappings gm
+                LEFT JOIN inventory i ON TRIM(LOWER(i.name)) = TRIM(LOWER(gm.brand_name)) AND TRIM(LOWER(i.batch_number)) = TRIM(LOWER(gm.batch_number))
+                WHERE TRIM(LOWER(gm.generic_name)) = TRIM(LOWER(?))
+                  AND LOWER(gm.brand_name) = '(unmapped brand)'
+                  
+                ORDER BY brand_name ASC, batch_number ASC
             ");
-            $stmt->execute([$generic]);
+            $stmt->execute([$generic, $generic]);
         }
         $brands = $stmt->fetchAll(PDO::FETCH_ASSOC);
         json_response($brands);

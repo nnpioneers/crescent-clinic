@@ -1385,8 +1385,8 @@ if (!String.prototype.toFixed) {
                             <div style="font-weight:700; color:var(--text-primary); margin-bottom:2px; font-size:0.95em; letter-spacing:0.02em;">
                                 ${item.name}
                             </div>
-                            <div style="font-size:0.78em; color:#6366f1; font-style:italic; margin-bottom:4px; font-weight:500;">Generic Medicine</div>
-                            <div style="font-size:0.85em; font-weight:500; color:var(--text-secondary); margin-top:2px;">Brands: ${item.brand_count !== undefined ? item.brand_count : 0}</div>
+                            <div style="font-size:0.78em; color:#10b981; font-style:italic; margin-bottom:4px; font-weight:500;">Item Master (Sold Without Brand)</div>
+                            <div style="font-size:0.85em; font-weight:500; color:var(--text-secondary); margin-top:2px;">Brands Mapped: ${item.brand_count !== undefined ? item.brand_count : 0}</div>
                         </div>`;
                     }
 
