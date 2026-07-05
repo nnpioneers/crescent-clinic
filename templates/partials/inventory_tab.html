@@ -4,20 +4,19 @@
                         <h1>Inventory Management</h1>
                         <p>Manage items, batches, stock and pricing.</p>
                     </div>
-                    <!-- Add New Medicine button shown only when Medicines sub-tab is active -->
-                    <button class="btn btn-primary" id="invAddMedBtn" onclick="openMedModal()">+ Add New Medicine / Batch</button>
+                    <!-- Add New Medicine button removed/hidden -->
+                    <button class="btn btn-primary" id="invAddMedBtn" onclick="openMedModal()" style="display:none;">+ Add New Medicine / Batch</button>
                 </div>
 
-                <!-- Sub-tab bar -->
-                <div class="tab-filters" id="invSubTabs" style="margin-bottom: 20px;">
-                    <button class="btn btn-outline btn-sm active" id="invTabMedicinesBtn" onclick="switchInvTab('medicines', this)">Medicines</button>
-                    <button class="btn btn-outline btn-sm" id="invTabItemsBtn" onclick="switchInvTab('items', this)" style="color:var(--primary); font-weight:600; border-color:var(--primary);">💊 Items</button>
+                <!-- Sub-tab bar (Medicines sub-tab removed) -->
+                <div class="tab-filters" id="invSubTabs" style="margin-bottom: 20px; display: none;">
+                    <button class="btn btn-outline btn-sm active" id="invTabItemsBtn" onclick="switchInvTab('items', this)" style="color:var(--primary); font-weight:600; border-color:var(--primary);">💊 Items</button>
                 </div>
 
                 <!-- ═══════════════════════════════════════════════════ -->
                 <!-- SUB-TAB: Medicines (existing inventory table)       -->
                 <!-- ═══════════════════════════════════════════════════ -->
-                <div id="inv-medicines" class="inv-subtab-content">
+                <div id="inv-medicines" class="inv-subtab-content" style="display:none;">
                     <div class="content-card">
                         <div class="card-header">
                             <input type="text" id="invSearch" placeholder="🔍 Search by name, code or batch..."
@@ -53,7 +52,7 @@
                 <!-- ═══════════════════════════════════════════════════ -->
                 <!-- SUB-TAB: Items (Generic Medicines — relocated)      -->
                 <!-- ═══════════════════════════════════════════════════ -->
-                <div id="inv-items" class="inv-subtab-content" style="display:none;">
+                <div id="inv-items" class="inv-subtab-content">
 
                     <!-- PAGE HEADER -->
                     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px;">

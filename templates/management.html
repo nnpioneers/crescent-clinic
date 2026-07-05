@@ -1521,17 +1521,10 @@
                 if (!window.loadedAdminSections['Inventory']) {
                     window.loadedAdminSections['Inventory'] = true;
                 }
-                // Always re-initialize the active sub-tab when switching to Inventory
                 if (typeof switchInvTab === 'function') {
-                    const activeInvBtn = document.querySelector('#invSubTabs .btn.active') || document.getElementById('invTabMedicinesBtn');
-                    let invTabName = 'medicines';
-                    if (activeInvBtn && activeInvBtn.getAttribute('onclick')) {
-                        const m = activeInvBtn.getAttribute('onclick').match(/switchInvTab\('([^']+)'/);
-                        if (m) invTabName = m[1];
-                    }
-                    switchInvTab(invTabName, activeInvBtn);
-                } else {
-                    loadInventory();
+                    switchInvTab('items', document.getElementById('invTabItemsBtn'));
+                } else if (typeof loadGenericMedicines === 'function') {
+                    loadGenericMedicines();
                 }
             }
             if (id === 'Patients' && !window.loadedAdminSections['Patients']) {
