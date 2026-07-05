@@ -1425,21 +1425,28 @@ if (!String.prototype.toFixed) {
                     let brandItems = group.filter(i => i.is_actual_without_brand != 1 && i.is_unmapped != 1);
 
                     if (unmappedPlaceholder) {
+                        // 1. Original Generic Item Result
                         html += `
-                        <div style="padding:10px 12px 6px 12px; border-bottom:none; background:var(--bg-surface); cursor:default;">
+                        <div class="med-sugg-item ${idx === 0 ? 'active-sugg' : ''}" style="padding:10px 12px; cursor:pointer; border-bottom:1px solid var(--border); transition: background 0.15s; ${idx === 0 ? 'background:var(--bg-hover);' : ''}" 
+                             onmouseenter="this.parentElement.querySelectorAll('.med-sugg-item').forEach(i => {i.classList.remove('active-sugg'); i.style.background=''}); this.classList.add('active-sugg'); this.style.background='var(--bg-hover)';"
+                             onmouseleave="this.classList.remove('active-sugg'); this.style.background=''"
+                             onclick="selectMedicine(this, '${unmappedPlaceholder.name.replace(/'/g, "\\'")}', ${unmappedPlaceholder.selling_price || 0}, ${unmappedPlaceholder.id}, ${unmappedPlaceholder.tablets_per_strip || 0}, 1)">
                             <div style="font-weight:700; color:var(--text-primary); margin-bottom:2px; font-size:1em; letter-spacing:0.02em;">
                                 ${unmappedPlaceholder.name}
                             </div>
-                            <div style="font-size:0.8em; color:#6366f1; font-style:italic; margin-bottom:4px; font-weight:600;">Item Medicine</div>
-                            <div style="font-size:0.85em; font-weight:500; color:var(--text-secondary); margin-top:2px;">Brands Available: ${unmappedPlaceholder.brand_count !== undefined ? unmappedPlaceholder.brand_count : 0}</div>
+                            <div style="font-size:0.8em; color:#6366f1; font-style:italic; margin-bottom:4px; font-weight:600;">Generic Medicine</div>
+                            <div style="font-size:0.85em; font-weight:500; color:var(--text-secondary); margin-top:2px;">Brands: ${unmappedPlaceholder.brand_count !== undefined ? unmappedPlaceholder.brand_count : 0}</div>
                         </div>`;
+                        idx++;
                     }
 
+                    // 2. Without Brand
                     if (withoutBrandItem) {
                         html += renderSuggItem(withoutBrandItem, idx === 0, false, true);
                         idx++;
                     }
                     
+                    // 3. Existing Brands
                     if (brandItems.length > 0) {
                         brandItems.forEach(b => {
                             html += renderSuggItem(b, idx === 0, false, false);
@@ -1447,6 +1454,7 @@ if (!String.prototype.toFixed) {
                         });
                     }
                     
+                    // 4. Add New Brand Option (Always present if unmappedPlaceholder exists, because unmappedPlaceholder represents the generic item group)
                     if (unmappedPlaceholder) {
                         html += renderSuggItem(unmappedPlaceholder, false, true, false);
                     }
