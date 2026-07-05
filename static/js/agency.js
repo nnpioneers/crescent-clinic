@@ -2047,9 +2047,21 @@ function gmBackToList() {
 // Open Edit Mapping modal using standard editMedModal
 window.gmOpenEditModal = function(encodedBrand) {
     const brand = JSON.parse(decodeURIComponent(encodedBrand));
+
+    // ── WITHOUT BRAND PROTECTION ──────────────────────────────────────────────
+    // If this is the "Without Brand" system default record, the real inventory
+    // row has name = generic_name (e.g. "RABE"), NOT "RABE (Without Brand)".
+    // We must pass the real name so the edit form shows/saves correctly, and
+    // inject the is_without_brand flag so the backend skips rename/merge/delete.
+    const isWithoutBrand = !!(brand.is_without_brand);
+    const realName = isWithoutBrand
+        ? (brand.generic_name || brand.brand_name || '')  // use generic_name as actual DB name
+        : (brand.brand_name || '');
+    // ─────────────────────────────────────────────────────────────────────────
+
     const item = {
         id: brand.inventory_id || '',
-        name: brand.brand_name || '',
+        name: realName,
         category: brand.category || 'TAB',
         item_code: brand.item_code || '',
         hsn_code: brand.hsn_code || '',
@@ -2066,7 +2078,8 @@ window.gmOpenEditModal = function(encodedBrand) {
         col_location: brand.col_location || '',
         agency_name: brand.supplier_name || '',
         generic_name: brand.generic_name || '',
-        brand_name: brand.brand_name || ''
+        brand_name: brand.brand_name || '',
+        is_without_brand: isWithoutBrand   // carry the flag into the save payload
     };
     if (typeof editMedModal === 'function') {
         editMedModal(item);

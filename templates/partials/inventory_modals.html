@@ -5,7 +5,7 @@
                 <button class="modal-close" onclick="closeModal('invModal')">X</button>
             </div>
             <div class="modal-body">
-                <form id="invForm" onsubmit="event.preventDefault(); saveInventory();"><input type="hidden" id="invId">
+                <form id="invForm" onsubmit="event.preventDefault(); saveInventory();"><input type="hidden" id="invId"><input type="hidden" id="invIsWithoutBrand" value="0">
                     <div class="responsive-grid">
                         <div class="form-group" style="position:relative;">
                             <label>Medicine Name *</label>

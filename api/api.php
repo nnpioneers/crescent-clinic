@@ -1345,7 +1345,7 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     $gm_generics = $stmt2->fetchAll(PDO::FETCH_COLUMN);
 
     $final_results = [];
-    $stmt_count = $conn->prepare("SELECT COUNT(*) FROM inventory WHERE generic_name = ? AND name != '(Unmapped Brand)' AND batch_number NOT LIKE 'ph_%'");
+    $stmt_count = $conn->prepare("SELECT COUNT(*) FROM inventory WHERE generic_name = ? AND name != '(Unmapped Brand)' AND batch_number NOT LIKE 'ph_%' AND name NOT LIKE '%(Without Brand)%'");
     
     foreach ($gm_generics as $g_name) {
         if (empty($g_name)) continue;
@@ -1371,7 +1371,7 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
         $stmt_brands->execute(["%$q%"]);
         $brand_batches = $stmt_brands->fetchAll(PDO::FETCH_ASSOC);
         foreach ($brand_batches as $r) {
-            if (strpos($r['batch_number'], 'ph_') === 0 || strtolower($r['brand_name']) === '(unmapped brand)' || strtolower($r['name']) === '(unmapped brand)' || strtolower($r['name']) === strtolower($r['generic_name'])) {
+            if (strpos($r['batch_number'], 'ph_') === 0 || strtolower($r['brand_name']) === '(unmapped brand)' || strtolower($r['name']) === '(unmapped brand)' || strtolower($r['name']) === strtolower($r['generic_name']) || strpos(strtolower($r['name']), '(without brand)') !== false) {
                 $r['name'] = $r['generic_name'] . ' (Without Brand)';
                 $r['is_actual_without_brand'] = 1;
             } else {
@@ -1415,7 +1415,7 @@ if ($uri === '/api/inventory/add' && $method === 'POST') {
     enforce_api_auth(['pharmacist']);
     $conn = get_db();
     $name = trim($input['name'] ?? '');
-    $name = trim(str_ireplace([' (Without Brand)', ' (Sold Without Brand)'], '', $name));
+    // $name = trim(str_ireplace([' (Without Brand)', ' (Sold Without Brand)'], '', $name));
     $batch_number = trim($input['batch_number'] ?? 'BATCH-01');
     $stock = (int)($input['stock'] ?? 0);
     $purchase_price = (float)($input['purchase_price'] ?? $input['cost_price'] ?? 0);
@@ -1435,7 +1435,7 @@ if ($uri === '/api/inventory/add' && $method === 'POST') {
         $generic_name = get_mapped_generic_name($conn, $name);
     }
     $brand_name = trim($input['brand_name'] ?? $name);
-    $brand_name = trim(str_ireplace([' (Without Brand)', ' (Sold Without Brand)'], '', $brand_name));
+    // $brand_name = trim(str_ireplace([' (Without Brand)', ' (Sold Without Brand)'], '', $brand_name));
     $agency_name = trim($input['agency_name'] ?? '');
 
     $supplier_id = null;
@@ -1542,8 +1542,37 @@ if ($uri === '/api/inventory/update' && $method === 'POST') {
     if (!$id) {
         json_response(['success' => false, 'error' => 'Item ID is required for update'], 400);
     }
-    $name = trim($input['name'] ?? '');
-    $name = trim(str_ireplace([' (Without Brand)', ' (Sold Without Brand)'], '', $name));
+
+    // ─── WITHOUT BRAND PROTECTION ─────────────────────────────────────────────
+    // Detect if this record is a "Without Brand" system default record.
+    // A Without Brand record is identified by: is_without_brand flag from the
+    // frontend, OR the item's name containing '(Without Brand)', OR
+    // the inventory record's name matching generic_name exactly (the original
+    // placeholder row that has brand_name = '(Unmapped Brand)' in generic_mappings).
+    $is_without_brand = !empty($input['is_without_brand']);
+
+    // Always verify server-side: fetch the original record
+    $orig_stmt = $conn->prepare("SELECT name, batch_number, generic_name FROM inventory WHERE id = ?");
+    $orig_stmt->execute([$id]);
+    $orig = $orig_stmt->fetch(PDO::FETCH_ASSOC);
+    $orig_name  = $orig['name']  ?? '';
+    $orig_batch = $orig['batch_number'] ?? '';
+    $orig_generic = $orig['generic_name'] ?? '';
+
+    // Server-side detection: also treat as Without Brand if the DB record's name
+    // matches the generic_name (i.e. the item IS the generic placeholder), or if
+    // the incoming name contains '(Without Brand)'.
+    if (!$is_without_brand) {
+        if (
+            stripos($orig_name, '(Without Brand)') !== false ||
+            (trim(strtolower($orig_name)) === trim(strtolower($orig_generic)) && $orig_generic !== '') ||
+            stripos(trim($input['name'] ?? ''), '(Without Brand)') !== false
+        ) {
+            $is_without_brand = true;
+        }
+    }
+    // ──────────────────────────────────────────────────────────────────────────
+
     $batch_number = trim($input['batch_number'] ?? '');
     $stock = (int)($input['stock'] ?? 0);
     $purchase_price = (float)($input['purchase_price'] ?? 0);
@@ -1558,13 +1587,76 @@ if ($uri === '/api/inventory/update' && $method === 'POST') {
     $min_stock = (int)($input['min_stock'] ?? 0);
     $row_location = trim($input['row_location'] ?? '');
     $col_location = trim($input['col_location'] ?? '');
+    $agency_name = trim($input['agency_name'] ?? '');
+
+    if ($is_without_brand) {
+        // ─── WITHOUT BRAND: SAFE UPDATE ONLY ─────────────────────────────────
+        // For Without Brand records, NEVER rename, NEVER delete, NEVER merge.
+        // Lock the name to the original DB value (the generic name itself).
+        // Only update pricing, stock, dates, and location fields.
+        $name = $orig_name; // Force use original name — never change identity
+        $generic_name = $orig_generic !== '' ? $orig_generic : trim($input['generic_name'] ?? '');
+        $brand_name = '(Unmapped Brand)'; // Keep the system brand_name tag
+
+        $supplier_id = null;
+        if ($agency_name !== '') {
+            $supp_stmt = $conn->prepare("SELECT id FROM agency_suppliers WHERE TRIM(LOWER(name)) = TRIM(LOWER(?))");
+            $supp_stmt->execute([$agency_name]);
+            $supplier_id = $supp_stmt->fetchColumn() ?: null;
+        }
+
+        // Simple UPDATE — no merge, no delete, no identity change
+        $stmt = $conn->prepare("UPDATE inventory SET
+            item_code = ?, generic_name = ?, agency_name = ?,
+            category = ?, hsn_code = ?, batch_number = ?,
+            mfg_date = ?, expiry_date = ?, mrp = ?, purchase_price = ?, selling_price = ?,
+            stock = ?, tablets_per_strip = ?, min_stock = ?, row_location = ?, col_location = ?,
+            supplier_id = ?
+            WHERE id = ?");
+        $stmt->execute([
+            $item_code, $generic_name, $agency_name,
+            $category, $hsn_code, $batch_number,
+            $mfg_date, $expiry_date, $mrp, $purchase_price, $selling_price,
+            $stock, $tablets_per_strip, $min_stock, $row_location, $col_location,
+            $supplier_id, $id
+        ]);
+
+        // Also update agency_items for the same record (by orig name + orig batch)
+        $curr_agency_stmt = $conn->prepare("SELECT id FROM agency_items WHERE TRIM(LOWER(item_name)) = TRIM(LOWER(?)) AND TRIM(LOWER(batch_number)) = TRIM(LOWER(?))");
+        $curr_agency_stmt->execute([$orig_name, $orig_batch]);
+        $curr_agency = $curr_agency_stmt->fetch(PDO::FETCH_ASSOC);
+        if ($curr_agency) {
+            $upd_agency = $conn->prepare("UPDATE agency_items SET
+                generic_name = ?, category = ?, batch_number = ?, expiry_date = ?, mrp = ?,
+                stock = ?, row_location = ?, col_location = ?, min_stock = ?, supplier_id = ?
+                WHERE id = ?");
+            $upd_agency->execute([
+                $generic_name, $category, $batch_number, $expiry_date, $mrp,
+                $stock, $row_location, $col_location, $min_stock, $supplier_id,
+                $curr_agency['id']
+            ]);
+        }
+
+        // Sync stock
+        sync_stock_item($conn, $name, $batch_number, 'pharmacy');
+
+        // Backfill historical zero-cost sales
+        $actual_unit_cost = ((int)$tablets_per_strip > 0) ? ((float)$purchase_price / (int)$tablets_per_strip) : (float)$purchase_price;
+        backfill_historical_medicine_cost($conn, $name, $actual_unit_cost);
+
+        json_response(['success' => true]);
+    }
+    // ──────────────────────────────────────────────────────────────────────────
+
+    // ─── NORMAL (BRANDED) RECORD UPDATE ───────────────────────────────────────
+    $name = trim($input['name'] ?? '');
+    // $name = trim(str_ireplace([' (Without Brand)', ' (Sold Without Brand)'], '', $name));
     $generic_name = trim($input['generic_name'] ?? '');
     if ($generic_name === '') {
         $generic_name = get_mapped_generic_name($conn, $name);
     }
     $brand_name = trim($input['brand_name'] ?? '');
-    $brand_name = trim(str_ireplace([' (Without Brand)', ' (Sold Without Brand)'], '', $brand_name));
-    $agency_name = trim($input['agency_name'] ?? '');
+    // $brand_name = trim(str_ireplace([' (Without Brand)', ' (Sold Without Brand)'], '', $brand_name));
 
     $supplier_id = null;
     if ($agency_name !== '') {
@@ -1572,13 +1664,6 @@ if ($uri === '/api/inventory/update' && $method === 'POST') {
         $supp_stmt->execute([$agency_name]);
         $supplier_id = $supp_stmt->fetchColumn() ?: null;
     }
-
-    // Get original name and batch before editing
-    $orig_stmt = $conn->prepare("SELECT name, batch_number FROM inventory WHERE id = ?");
-    $orig_stmt->execute([$id]);
-    $orig = $orig_stmt->fetch(PDO::FETCH_ASSOC);
-    $orig_name = $orig['name'] ?? '';
-    $orig_batch = $orig['batch_number'] ?? '';
 
     // Check if there is an existing agency_item with the target (name, batch_number)
     $chk_agency = $conn->prepare("SELECT id, stock FROM agency_items WHERE TRIM(LOWER(item_name)) = TRIM(LOWER(?)) AND TRIM(LOWER(batch_number)) = TRIM(LOWER(?))");
@@ -1752,9 +1837,28 @@ if (preg_match('/^\/api\/inventory\/delete\/(\d+)$/', $uri, $matches)) {
     $conn = get_db();
     
     // Fetch item details before deleting
-    $stmt_name = $conn->prepare("SELECT name, batch_number FROM inventory WHERE id = ?");
+    $stmt_name = $conn->prepare("SELECT name, batch_number, generic_name, brand_name FROM inventory WHERE id = ?");
     $stmt_name->execute([$item_id]);
     $item_info = $stmt_name->fetch(PDO::FETCH_ASSOC);
+
+    // ─── WITHOUT BRAND PROTECTION ─────────────────────────────────────────────
+    // Never allow deletion of the Without Brand system default record.
+    // Identified by: name == generic_name (the generic placeholder row), or
+    // brand_name == '(Unmapped Brand)' in generic_mappings for this item.
+    if ($item_info) {
+        $item_name    = $item_info['name'] ?? '';
+        $item_generic = $item_info['generic_name'] ?? '';
+        $item_brand   = strtolower(trim($item_info['brand_name'] ?? ''));
+        $is_wb = (
+            stripos($item_name, '(Without Brand)') !== false ||
+            ($item_generic !== '' && trim(strtolower($item_name)) === trim(strtolower($item_generic))) ||
+            $item_brand === '(unmapped brand)'
+        );
+        if ($is_wb) {
+            json_response(['success' => false, 'error' => 'The "Without Brand" record cannot be deleted. It is a system default record for this medicine.'], 403);
+        }
+    }
+    // ──────────────────────────────────────────────────────────────────────────
     
     $stmt = $conn->prepare("DELETE FROM inventory WHERE id = ?");
     $stmt->execute([$item_id]);
@@ -4968,7 +5072,8 @@ if ($uri === '/api/generics/brands' && $method === 'GET') {
                     i.hsn_code,
                     i.mfg_date,
                     i.purchase_price,
-                    i.selling_price
+                    i.selling_price,
+                    1 as is_without_brand
                 FROM generic_mappings gm
                 LEFT JOIN inventory i ON TRIM(LOWER(i.name)) = TRIM(LOWER(gm.generic_name)) AND TRIM(LOWER(i.batch_number)) = TRIM(LOWER(gm.batch_number))
                 WHERE TRIM(LOWER(gm.generic_name)) = TRIM(LOWER(?))

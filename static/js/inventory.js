@@ -283,6 +283,9 @@
             document.getElementById('invAgencyName').value = item.agency_name || '';
             document.getElementById('invGenericName').value = item.generic_name || '';
             document.getElementById('invBrandName').value = item.brand_name || '';
+            // Store the Without Brand flag so saveInventory can include it in the payload
+            const wbFlag = document.getElementById('invIsWithoutBrand');
+            if (wbFlag) wbFlag.value = item.is_without_brand ? '1' : '0';
             toggleInventoryFields();
             openModal('invModal');
         }
@@ -300,6 +303,9 @@
             document.getElementById('invCatOther').style.display = 'none';
             document.getElementById('invCatOther').required = false;
             document.getElementById('invModalTitle').textContent = 'Add New Medicine / Batch';
+            // Clear Without Brand flag for new items
+            const wbFlag = document.getElementById('invIsWithoutBrand');
+            if (wbFlag) wbFlag.value = '0';
             toggleInventoryFields(); // Set initial state
             openModal('invModal');
         }
@@ -332,6 +338,11 @@
                 generic_name: (document.getElementById('invGenericName').value || '').trim(),
                 brand_name: (document.getElementById('invBrandName').value || '').trim()
             };
+            // Include Without Brand protection flag
+            const wbFlagEl = document.getElementById('invIsWithoutBrand');
+            if (wbFlagEl && wbFlagEl.value === '1') {
+                payload.is_without_brand = true;
+            }
             if (invId) { payload.id = invId; }
             try {
                 const url = invId ? '/api/inventory/update' : '/api/inventory/add';
