@@ -1296,9 +1296,10 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
         $params[] = "%$q%";
         $params[] = "%$q%";
     }
-    if (!$include_all) {
-        $conditions[] = "i.stock > 0";
-    }
+    // User request: Do NOT filter by stock, price, etc. in search dropdown
+    // if (!$include_all) {
+    //     $conditions[] = "i.stock > 0";
+    // }
     
     if ($category === 'medicine') {
         $conditions[] = "i.category NOT IN ('Injection', 'INJ', 'IV')";
