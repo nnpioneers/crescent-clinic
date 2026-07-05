@@ -4791,7 +4791,7 @@ if ($uri === '/api/generics/list' && $method === 'GET') {
         $sql = "
             SELECT 
                 TRIM(generic_name) AS generic_name, 
-                COUNT(DISTINCT case when LOWER(TRIM(brand_name)) != '(unmapped brand)' then TRIM(brand_name) end) AS brand_count 
+                COUNT(*) AS brand_count 
             FROM generic_mappings
             $where
             GROUP BY TRIM(generic_name)
