@@ -5046,7 +5046,8 @@ if ($uri === '/api/generics/brands' && $method === 'GET') {
                     i.hsn_code,
                     i.mfg_date,
                     i.purchase_price,
-                    i.selling_price
+                    i.selling_price,
+                    0 as is_without_brand
                 FROM generic_mappings gm
                 LEFT JOIN inventory i ON TRIM(LOWER(i.name)) = TRIM(LOWER(gm.brand_name)) AND TRIM(LOWER(i.batch_number)) = TRIM(LOWER(gm.batch_number))
                 WHERE TRIM(LOWER(gm.generic_name)) = TRIM(LOWER(?))
