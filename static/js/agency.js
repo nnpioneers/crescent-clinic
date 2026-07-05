@@ -398,7 +398,6 @@ async function openAgencyItemModal() {
 
     document.getElementById('agItemId').value = '';
     document.getElementById('agItemName').value = '';
-    if (document.getElementById('agItemGeneric')) document.getElementById('agItemGeneric').value = '';
     if (document.getElementById('agItemBrand')) document.getElementById('agItemBrand').value = '';
     if (document.getElementById('agItemType')) document.getElementById('agItemType').value = '';
     document.getElementById('agItemBatch').value = '';
@@ -433,7 +432,6 @@ async function editAgencyItem(i) {
     document.getElementById('agItemId').value = i.id;
     if (document.getElementById('agItemCode')) document.getElementById('agItemCode').value = i.item_code || '';
     document.getElementById('agItemName').value = i.item_name;
-    if (document.getElementById('agItemGeneric')) document.getElementById('agItemGeneric').value = i.generic_name || '';
     if (document.getElementById('agItemBrand')) document.getElementById('agItemBrand').value = i.brand_name || '';
     if (document.getElementById('agItemType')) document.getElementById('agItemType').value = i.medicine_type || '';
     document.getElementById('agItemBatch').value = i.batch_number;
@@ -467,7 +465,7 @@ async function saveAgencyItem() {
             id: document.getElementById('agItemId').value,
             item_code: document.getElementById('agItemCode') ? document.getElementById('agItemCode').value : '',
             item_name: document.getElementById('agItemName').value,
-            generic_name: document.getElementById('agItemGeneric') ? document.getElementById('agItemGeneric').value : '',
+            generic_name: document.getElementById('agItemName').value,
             brand_name: document.getElementById('agItemBrand') ? document.getElementById('agItemBrand').value : '',
             medicine_type: document.getElementById('agItemType') ? document.getElementById('agItemType').value : '',
             batch_number: document.getElementById('agItemBatch').value,
@@ -610,7 +608,6 @@ async function editAgencyPurchase(id) {
                     addAgPurcRow();
                     const row = document.getElementById('agPurcItemsBody').lastElementChild;
                     row.querySelector('.purc-name').value = i.item_name || '';
-                    row.querySelector('.purc-generic').value = i.generic_name || '';
                     row.querySelector('.purc-hsn').value = i.hsn_code || '';
                     row.querySelector('.purc-batch').value = i.batch_number || '';
                     row.querySelector('.purc-mfg').value = i.mfg_date || '';
