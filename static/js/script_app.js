@@ -1825,7 +1825,7 @@ if (!String.prototype.toFixed) {
                 const newBrand = brandInput.value.trim();
                 if (newBrand) {
                     const amount = parseFloat(row.querySelector('.med-amount').value) || 0;
-                    const tps = parseInt(row.querySelector('.med-tps').value) || 0;
+                    const tps = parseInt(row.querySelector('.med-tps').value) || 1;
                     const strips = parseFloat(row.querySelector('.med-strips').value) || 0;
                     const tablets = parseFloat(row.querySelector('.med-qty').value) || 0;
                     const totalQty = (strips * tps) + tablets;
@@ -1851,7 +1851,7 @@ if (!String.prototype.toFixed) {
         const medicines = [];
         rows.forEach(row => {
             const name = row.querySelector('.med-name').value.trim();
-            const tps = parseInt(row.querySelector('.med-tps').value) || 0;
+            const tps = parseInt(row.querySelector('.med-tps').value) || 1;
             const strips = parseFloat(row.querySelector('.med-strips').value) || 0;
             const tablets = parseFloat(row.querySelector('.med-qty').value) || 0;
 

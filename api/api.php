@@ -827,21 +827,21 @@ if (($uri === '/api/add_medicines' || $uri === '/api/direct_pharmacy') && $metho
                         $tps = max(1, (int)($row['tablets_per_strip'] ?? 1));
                         $cost_per_unit = (float)$row['purchase_price'] / $tps;
                         $total_cost += $cost_per_unit * $qty;
-                        $stmt = $conn->prepare("UPDATE inventory SET stock = GREATEST(stock - ?, 0) WHERE id=?");
+                        $stmt = $conn->prepare("UPDATE inventory SET stock = stock - ? WHERE id=?");
                         $stmt->execute([$qty, $batch_id]);
                         
                         // Sync stock to agency inventory
                         sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
                     }
                 } else {
-                    $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, tablets_per_strip, id FROM inventory WHERE name=? AND stock > 0 ORDER BY expiry_date ASC LIMIT 1");
+                    $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, tablets_per_strip, id FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
                     $stmt->execute([$name]);
                     $row = $stmt->fetch();
                     if ($row) {
                         $tps = max(1, (int)($row['tablets_per_strip'] ?? 1));
                         $cost_per_unit = (float)$row['purchase_price'] / $tps;
                         $total_cost += $cost_per_unit * $qty;
-                        $stmt = $conn->prepare("UPDATE inventory SET stock = GREATEST(stock - ?, 0) WHERE id=?");
+                        $stmt = $conn->prepare("UPDATE inventory SET stock = stock - ? WHERE id=?");
                         $stmt->execute([$qty, $row['id']]);
                         
                         // Sync stock to agency inventory
@@ -853,12 +853,12 @@ if (($uri === '/api/add_medicines' || $uri === '/api/direct_pharmacy') && $metho
 
         $deduct_stock_by_name = function($item_name) use ($conn, &$total_cost) {
             if (!$item_name || trim($item_name) === '') return;
-            $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, id FROM inventory WHERE name=? AND stock > 0 ORDER BY expiry_date ASC LIMIT 1");
+            $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, id FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
             $stmt->execute([trim($item_name)]);
             $row = $stmt->fetch();
             if ($row) {
                 $total_cost += (float)$row['purchase_price'];
-                $stmt = $conn->prepare("UPDATE inventory SET stock = GREATEST(stock - 1, 0) WHERE id=?");
+                $stmt = $conn->prepare("UPDATE inventory SET stock = stock - 1 WHERE id=?");
                 $stmt->execute([$row['id']]);
                 
                 // Sync stock to agency inventory
@@ -873,11 +873,11 @@ if (($uri === '/api/add_medicines' || $uri === '/api/direct_pharmacy') && $metho
             $deduct_stock_by_name($iv_details);
         }
         if ($upt_cost > 0) {
-            $stmt = $conn->query("SELECT name, batch_number, purchase_price, id FROM inventory WHERE category='UPT Card' AND stock > 0 ORDER BY expiry_date ASC LIMIT 1");
+            $stmt = $conn->query("SELECT name, batch_number, purchase_price, id FROM inventory WHERE category='UPT Card' ORDER BY expiry_date ASC LIMIT 1");
             $row = $stmt->fetch();
             if ($row) {
                 $total_cost += (float)$row['purchase_price'];
-                $stmt = $conn->prepare("UPDATE inventory SET stock = GREATEST(stock - 1, 0) WHERE id=?");
+                $stmt = $conn->prepare("UPDATE inventory SET stock = stock - 1 WHERE id=?");
                 $stmt->execute([$row['id']]);
                 
                 // Sync stock to agency inventory
@@ -982,17 +982,17 @@ if ($uri === '/api/direct_sales/add' && $method === 'POST') {
                     if ($row) {
                         $tps = max(1, (int)($row['tablets_per_strip'] ?? 1));
                         $m_cost = ((float)$row['purchase_price'] / $tps) * $qty;
-                        $conn->prepare("UPDATE inventory SET stock = GREATEST(stock - ?, 0) WHERE id=?")->execute([$qty, $batch_id]);
+                        $conn->prepare("UPDATE inventory SET stock = stock - ? WHERE id=?")->execute([$qty, $batch_id]);
                         sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
                     }
                 } else {
-                    $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, tablets_per_strip, id FROM inventory WHERE name=? AND stock > 0 ORDER BY expiry_date ASC LIMIT 1");
+                    $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, tablets_per_strip, id FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
                     $stmt->execute([$name]);
                     $row = $stmt->fetch();
                     if ($row) {
                         $tps = max(1, (int)($row['tablets_per_strip'] ?? 1));
                         $m_cost = ((float)$row['purchase_price'] / $tps) * $qty;
-                        $conn->prepare("UPDATE inventory SET stock = GREATEST(stock - ?, 0) WHERE id=?")->execute([$qty, $row['id']]);
+                        $conn->prepare("UPDATE inventory SET stock = stock - ? WHERE id=?")->execute([$qty, $row['id']]);
                         sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
                     }
                 }
@@ -1007,12 +1007,12 @@ if ($uri === '/api/direct_sales/add' && $method === 'POST') {
 
         $deduct_single = function($item_name) use ($conn, &$total_cost) {
             if (!$item_name || trim($item_name) === '') return;
-            $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, id FROM inventory WHERE name=? AND stock > 0 ORDER BY expiry_date ASC LIMIT 1");
+            $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, id FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
             $stmt->execute([trim($item_name)]);
             $row = $stmt->fetch();
             if ($row) {
                 $total_cost += (float)$row['purchase_price'];
-                $conn->prepare("UPDATE inventory SET stock = GREATEST(stock - 1, 0) WHERE id=?")->execute([$row['id']]);
+                $conn->prepare("UPDATE inventory SET stock = stock - 1 WHERE id=?")->execute([$row['id']]);
                 sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
             }
         };
@@ -1020,11 +1020,11 @@ if ($uri === '/api/direct_sales/add' && $method === 'POST') {
         if ($injection_cost > 0 && $injection_details) $deduct_single($injection_details);
         if ($iv_cost > 0 && $iv_details)                 $deduct_single($iv_details);
         if ($upt_cost > 0) {
-            $stmt = $conn->query("SELECT name, batch_number, purchase_price, id FROM inventory WHERE category='UPT Card' AND stock > 0 ORDER BY expiry_date ASC LIMIT 1");
+            $stmt = $conn->query("SELECT name, batch_number, purchase_price, id FROM inventory WHERE category='UPT Card' ORDER BY expiry_date ASC LIMIT 1");
             $row  = $stmt->fetch();
             if ($row) {
                 $total_cost += (float)$row['purchase_price'];
-                $conn->prepare("UPDATE inventory SET stock = GREATEST(stock - 1, 0) WHERE id=?")->execute([$row['id']]);
+                $conn->prepare("UPDATE inventory SET stock = stock - 1 WHERE id=?")->execute([$row['id']]);
                 sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
             }
         }
