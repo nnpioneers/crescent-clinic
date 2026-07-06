@@ -1909,7 +1909,9 @@ if ($uri === '/api/inventory/auto_create_brand' && $method === 'POST') {
         // 1. Check if brand already exists under this generic medicine (Case-Insensitive)
         $chk = $conn->prepare("SELECT id FROM generic_mappings WHERE TRIM(LOWER(generic_name)) = TRIM(LOWER(?)) AND TRIM(LOWER(brand_name)) = TRIM(LOWER(?))");
         $chk->execute([$generic_name, $brand_name]);
-        if ($chk->fetch()) {
+        $exists_gm = $chk->fetch();
+        $chk->closeCursor();
+        if ($exists_gm) {
             $conn->exec("SELECT RELEASE_LOCK('$lockName')");
             json_response(['success' => true, 'message' => 'Brand already exists']);
         }
@@ -1917,7 +1919,9 @@ if ($uri === '/api/inventory/auto_create_brand' && $method === 'POST') {
         // Also check if it exists globally in inventory to avoid creating duplicate inventory names
         $chk2 = $conn->prepare("SELECT id FROM inventory WHERE TRIM(LOWER(name)) = TRIM(LOWER(?))");
         $chk2->execute([$brand_name]);
-        if ($chk2->fetch()) {
+        $exists_inv = $chk2->fetch();
+        $chk2->closeCursor();
+        if ($exists_inv) {
             // It's in inventory but maybe not mapped to this generic. Map it.
             $batch = 'BATCH-01';
             $stmt3 = $conn->prepare("INSERT INTO generic_mappings (brand_name, generic_name, mrp, stock, batch_number) VALUES (?, ?, ?, 0, ?) ON DUPLICATE KEY UPDATE generic_name = VALUES(generic_name), mrp = VALUES(mrp)");
