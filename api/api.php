@@ -1361,6 +1361,35 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     $stmt2->execute($gm_params);
     $gm_generics = $stmt2->fetchAll(PDO::FETCH_COLUMN);
 
+    // ── BUG FIX: Also pick up generics that exist in agency_items but have not
+    // yet been synced into generic_mappings (e.g. just created via /api/generics/add).
+    if ($q) {
+        $ai_conditions = ["LOWER(item_name) = '(unmapped brand)'", "generic_name IS NOT NULL", "TRIM(generic_name) != ''", "generic_name LIKE ?"];
+        $ai_params     = ["%$q%"];
+        if ($category === 'medicine') {
+            $ai_conditions[] = "category NOT IN ('Injection', 'INJ', 'IV')";
+        } elseif ($category === 'Injection' || $category === 'INJ') {
+            $ai_conditions[] = "category IN ('Injection', 'INJ')";
+        } elseif ($category) {
+            $ai_conditions[] = "category = ?";
+            $ai_params[] = $category;
+        }
+        $ai_query = "SELECT DISTINCT generic_name FROM agency_items WHERE " . implode(" AND ", $ai_conditions) . " ORDER BY generic_name ASC LIMIT 30";
+        $stmt_ai = $conn->prepare($ai_query);
+        $stmt_ai->execute($ai_params);
+        $ai_generics = $stmt_ai->fetchAll(PDO::FETCH_COLUMN);
+
+        // Merge, deduplicate (case-insensitive), preserve existing order
+        $existing_lower = array_map('strtolower', $gm_generics);
+        foreach ($ai_generics as $ag) {
+            if (!in_array(strtolower($ag), $existing_lower, true)) {
+                $gm_generics[]      = $ag;
+                $existing_lower[]   = strtolower($ag);
+            }
+        }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     $final_results = [];
     $stmt_count = $conn->prepare("SELECT COUNT(*) FROM inventory WHERE generic_name = ? AND name != '(Unmapped Brand)' AND batch_number NOT LIKE 'ph_%' AND name NOT LIKE '%(Without Brand)%'");
     
@@ -1387,10 +1416,15 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
         $stmt_brands = $conn->prepare($brand_query);
         $stmt_brands->execute(["%$q%"]);
         $brand_batches = $stmt_brands->fetchAll(PDO::FETCH_ASSOC);
+
+        // Track which generics already have a "Without Brand" result from inventory
+        $generics_with_without_brand = [];
+
         foreach ($brand_batches as $r) {
             if (strpos($r['batch_number'], 'ph_') === 0 || strtolower($r['brand_name']) === '(unmapped brand)' || strtolower($r['name']) === '(unmapped brand)' || strtolower($r['name']) === strtolower($r['generic_name']) || strpos(strtolower($r['name']), '(without brand)') !== false) {
                 $r['name'] = $r['generic_name'] . ' (Without Brand)';
                 $r['is_actual_without_brand'] = 1;
+                $generics_with_without_brand[strtolower($r['generic_name'])] = true;
             } else {
                 $r['is_actual_without_brand'] = 0;
             }
@@ -1398,6 +1432,69 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
             $r['is_generic_header'] = 0;
             $final_results[] = $r;
         }
+
+        // ── BUG FIX: Synthesize "Without Brand" for newly created generics ────────
+        // When a Generic Medicine is first created (via /api/generics/add), it only
+        // creates an agency_items row with item_name='(Unmapped Brand)'. The inventory
+        // table record is NOT created until the user manually edits/saves via View Brands.
+        // This means the inventory brand query above finds nothing for such generics.
+        // Fix: For every generic in our search results that has an (Unmapped Brand)
+        // placeholder in generic_mappings or agency_items but NO "Without Brand" result
+        // yet from inventory, synthesize a "Without Brand" placeholder immediately.
+        if (!empty($gm_generics)) {
+            $placeholders = implode(',', array_fill(0, count($gm_generics), '?'));
+
+            // Check generic_mappings for (Unmapped Brand) entries
+            $stmt_wb_gm = $conn->prepare(
+                "SELECT DISTINCT generic_name, category FROM generic_mappings
+                 WHERE LOWER(brand_name) = '(unmapped brand)'
+                   AND generic_name IN ($placeholders)"
+            );
+            $stmt_wb_gm->execute($gm_generics);
+            $wb_gm_rows = $stmt_wb_gm->fetchAll(PDO::FETCH_ASSOC);
+
+            // Also check agency_items for (Unmapped Brand) entries not yet in generic_mappings
+            $stmt_wb_ai = $conn->prepare(
+                "SELECT DISTINCT generic_name, category FROM agency_items
+                 WHERE LOWER(item_name) = '(unmapped brand)'
+                   AND generic_name IN ($placeholders)"
+            );
+            $stmt_wb_ai->execute($gm_generics);
+            $wb_ai_rows = $stmt_wb_ai->fetchAll(PDO::FETCH_ASSOC);
+
+            // Merge both sources
+            $wb_generics = [];
+            foreach (array_merge($wb_gm_rows, $wb_ai_rows) as $row) {
+                $key = strtolower(trim($row['generic_name']));
+                if (!isset($wb_generics[$key])) {
+                    $wb_generics[$key] = $row;
+                }
+            }
+
+            foreach ($wb_generics as $key => $row) {
+                // Only add if we don't already have a "Without Brand" from inventory
+                if (!isset($generics_with_without_brand[$key])) {
+                    $g_name = $row['generic_name'];
+                    $final_results[] = [
+                        'id'                    => -1 * abs(crc32($g_name . '_wb')),
+                        'name'                  => $g_name . ' (Without Brand)',
+                        'generic_name'          => $g_name,
+                        'brand_name'            => '(Unmapped Brand)',
+                        'category'              => $row['category'] ?? 'TAB',
+                        'batch_number'          => 'BATCH-01',
+                        'selling_price'         => 0,
+                        'purchase_price'        => 0,
+                        'mrp'                   => 0,
+                        'stock'                 => 0,
+                        'tablets_per_strip'     => 0,
+                        'is_unmapped'           => 0,
+                        'is_generic_header'     => 0,
+                        'is_actual_without_brand' => 1,
+                    ];
+                }
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────────────
     }
 
     usort($final_results, function($a, $b) {
