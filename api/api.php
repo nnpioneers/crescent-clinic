@@ -41,6 +41,19 @@ if (!function_exists('json_response')) {
     }
 }
 
+// Global Exception Handler
+set_exception_handler(function($e) {
+    json_response([
+        'success' => false,
+        'error' => 'Internal Server Error: ' . $e->getMessage()
+    ], 500);
+});
+
+// Global Error Handler
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
+});
+
 function enforce_api_auth($allowed_roles = []) {
     if (!isset($_SESSION['user_id'])) {
         if (function_exists('json_response')) {
@@ -1532,16 +1545,16 @@ if ($uri === '/api/inventory/add' && $method === 'POST') {
     // $name = trim(str_ireplace([' (Without Brand)', ' (Sold Without Brand)'], '', $name));
     $batch_number = trim($input['batch_number'] ?? 'BATCH-01');
     $stock = (int)($input['stock'] ?? 0);
-    $purchase_price = (float)($input['purchase_price'] ?? $input['cost_price'] ?? 0);
-    $selling_price = (float)($input['selling_price'] ?? 0);
-    $mrp = (float)($input['mrp'] ?? $selling_price);
+    $purchase_price = max(0, (float)($input['purchase_price'] ?? $input['cost_price'] ?? 0));
+    $selling_price = max(0, (float)($input['selling_price'] ?? 0));
+    $mrp = max(0, (float)($input['mrp'] ?? $selling_price));
     $mfg_date = $input['mfg_date'] ?? '';
     $expiry_date = $input['expiry_date'] ?? '';
     $item_code = $input['item_code'] ?? '';
     $category = $input['category'] ?? 'TAB';
     $hsn_code = $input['hsn_code'] ?? '';
-    $tablets_per_strip = (int)($input['tablets_per_strip'] ?? 0);
-    $min_stock = (int)($input['min_stock'] ?? 0);
+    $tablets_per_strip = max(0, (int)($input['tablets_per_strip'] ?? 0));
+    $min_stock = max(0, (int)($input['min_stock'] ?? 0));
     $row_location = trim($input['row_location'] ?? '');
     $col_location = trim($input['col_location'] ?? '');
     $generic_name = trim($input['generic_name'] ?? '');
@@ -4361,16 +4374,26 @@ if ($uri === '/api/staff_records/save' && $method === 'POST') {
     $conn = get_db();
     try {
         $id = $input['id'] ?? null;
-        $name = $input['name'] ?? '';
-        $phone = $input['phone'] ?? '';
-        $education = $input['education'] ?? '';
-        $role = $input['role'] ?? '';
-        $salary = $input['salary'] ?? 0.00;
+        $name = trim((string)($input['name'] ?? ''));
+        $phone = trim((string)($input['phone'] ?? ''));
+        $education = trim((string)($input['education'] ?? ''));
+        $role = trim((string)($input['role'] ?? ''));
+        $salary = max(0, (float)($input['salary'] ?? 0.00));
+        
+        if ($name === '') {
+            throw new Exception("Staff name cannot be empty.");
+        }
         
         if ($id) {
             $stmt = $conn->prepare("UPDATE staff_records SET name=?, phone=?, education=?, role=?, salary=? WHERE id=?");
             $stmt->execute([$name, $phone, $education, $role, $salary, $id]);
         } else {
+            // Check duplicate
+            $check = $conn->prepare("SELECT id FROM staff_records WHERE name=? AND phone=?");
+            $check->execute([$name, $phone]);
+            if ($check->fetch()) {
+                throw new Exception("A staff member with this name and phone already exists.");
+            }
             $stmt = $conn->prepare("INSERT INTO staff_records (name, phone, education, role, salary) VALUES (?, ?, ?, ?, ?)");
             $stmt->execute([$name, $phone, $education, $role, $salary]);
         }
