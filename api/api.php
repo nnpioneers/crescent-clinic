@@ -1903,7 +1903,7 @@ if ($uri === '/api/inventory/auto_create_brand' && $method === 'POST') {
     
     // Use MySQL Named Lock to prevent race conditions (double clicks)
     $lockName = 'brand_create_' . md5(strtolower($brand_name));
-    $conn->exec("SELECT GET_LOCK('$lockName', 5)");
+    $conn->query("SELECT GET_LOCK('$lockName', 5)")->closeCursor();
     
     try {
         // 1. Check if brand already exists under this generic medicine (Case-Insensitive)
@@ -1912,7 +1912,7 @@ if ($uri === '/api/inventory/auto_create_brand' && $method === 'POST') {
         $exists_gm = $chk->fetch();
         $chk->closeCursor();
         if ($exists_gm) {
-            $conn->exec("SELECT RELEASE_LOCK('$lockName')");
+            $conn->query("SELECT RELEASE_LOCK('$lockName')")->closeCursor();
             json_response(['success' => true, 'message' => 'Brand already exists']);
         }
         
@@ -1927,7 +1927,7 @@ if ($uri === '/api/inventory/auto_create_brand' && $method === 'POST') {
             $stmt3 = $conn->prepare("INSERT INTO generic_mappings (brand_name, generic_name, mrp, stock, batch_number) VALUES (?, ?, ?, 0, ?) ON DUPLICATE KEY UPDATE generic_name = VALUES(generic_name), mrp = VALUES(mrp)");
             $stmt3->execute([$brand_name, $generic_name, $unit_price, $batch]);
             
-            $conn->exec("SELECT RELEASE_LOCK('$lockName')");
+            $conn->query("SELECT RELEASE_LOCK('$lockName')")->closeCursor();
             json_response(['success' => true, 'message' => 'Brand mapped from existing inventory']);
         }
         
@@ -1947,13 +1947,13 @@ if ($uri === '/api/inventory/auto_create_brand' && $method === 'POST') {
         $stmt3->execute([$brand_name, $generic_name, $unit_price, $batch]);
         
     } catch (PDOException $e) {
-        $conn->exec("SELECT RELEASE_LOCK('$lockName')");
+        $conn->query("SELECT RELEASE_LOCK('$lockName')")->closeCursor();
         json_response(['error' => 'Database error: ' . $e->getMessage()], 500);
     } catch (Exception $e) {
-        $conn->exec("SELECT RELEASE_LOCK('$lockName')");
+        $conn->query("SELECT RELEASE_LOCK('$lockName')")->closeCursor();
         json_response(['error' => 'Error: ' . $e->getMessage()], 500);
     } finally {
-        $conn->exec("SELECT RELEASE_LOCK('$lockName')");
+        $conn->query("SELECT RELEASE_LOCK('$lockName')")->closeCursor();
     }
     
     json_response(['success' => true]);
