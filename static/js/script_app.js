@@ -1859,7 +1859,10 @@ if (!String.prototype.toFixed) {
             const amount = parseFloat(row.querySelector('.med-amount').value) || 0;
             const unit_price = totalQty > 0 ? (amount / totalQty) : 0;
             const batch_id = row.querySelector('.med-batch-id') ? row.querySelector('.med-batch-id').value : '';
-            if (name && totalQty > 0) medicines.push({ name, qty: totalQty, unit_price, amount, batch_id });
+            // A row is valid if it has a name — qty may be 0 for newly created
+            // "Without Brand" medicines where pricing/stock is filled in later.
+            // Only skip rows that are completely empty (no name at all).
+            if (name) medicines.push({ name, qty: totalQty, unit_price, amount, batch_id });
         });
 
         let injCost = 0;
