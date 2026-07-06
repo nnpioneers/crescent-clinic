@@ -1502,7 +1502,10 @@ window.onunhandledrejection = function(event) {
             wrapper.className = 'unmapped-brand-input';
             wrapper.style.marginTop = '8px';
             wrapper.innerHTML = `<label style="font-size:0.85em; color:var(--text-secondary); margin-bottom:4px; display:block;">Brand Name (Optional)</label>
-                                 <input type="text" class="form-control med-new-brand" placeholder="Enter Brand Name" style="font-size:0.9em; border-color:#6366f1;">`;
+                                 <div style="display:flex; gap:6px;">
+                                     <input type="text" class="form-control med-new-brand" placeholder="Enter Brand Name" style="font-size:0.9em; border-color:#6366f1;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); saveNewBrandInline(this); }">
+                                     <button type="button" class="btn btn-primary btn-sm" onclick="saveNewBrandInline(this)" style="padding: 0 12px; font-weight:600;">Save</button>
+                                 </div>`;
             row.querySelector('.med-name').parentNode.appendChild(wrapper);
         }
 
@@ -1518,6 +1521,44 @@ window.onunhandledrejection = function(event) {
                 qtyInput.select();
             }
         }, 10);
+    };
+
+    window.saveNewBrandInline = async function (el) {
+        const wrapper = el.closest('.unmapped-brand-input');
+        if (!wrapper) return;
+        const row = wrapper.closest('.medicine-row');
+        const brandInput = wrapper.querySelector('.med-new-brand');
+        const newBrand = brandInput ? brandInput.value.trim() : '';
+        
+        if (!newBrand) return toast('Please enter a Brand Name', 'error');
+        
+        const genericName = row.querySelector('.med-name').value.trim();
+        const btn = wrapper.querySelector('button');
+        if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+        
+        try {
+            const res = await api('/api/inventory/auto_create_brand', {
+                method: 'POST',
+                body: { generic_name: genericName, brand_name: newBrand, unit_price: 0 }
+            });
+            if (res.success) {
+                row.querySelector('.med-name').value = newBrand;
+                wrapper.remove();
+                toast('New Brand successfully added to inventory!', 'success');
+                // Move focus to next input
+                const qtyInput = row.querySelector('.med-qty');
+                if (qtyInput) {
+                    qtyInput.focus();
+                    qtyInput.select();
+                }
+            } else {
+                toast(res.error || res.message || 'Failed to add brand', 'error');
+            }
+        } catch (e) {
+            toast('Error: ' + e.message, 'error');
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+        }
     };
 
     window.autoFillMedData = async function (inputEl) {
@@ -1857,9 +1898,11 @@ window.onunhandledrejection = function(event) {
                             row.querySelector('.med-name').value = newBrand;
                             const wrapper = brandInput.closest('.unmapped-brand-input');
                             if (wrapper) wrapper.remove();
+                        } else {
+                            return toast(res.error || res.message || 'Failed to auto-create brand', 'error');
                         }
                     } catch (e) {
-                        return toast('Failed to auto-create brand for ' + genericName, 'error');
+                        return toast('Error: ' + e.message, 'error');
                     }
                 }
             }
