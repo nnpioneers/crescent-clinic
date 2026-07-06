@@ -1931,17 +1931,23 @@ if ($uri === '/api/inventory/auto_create_brand' && $method === 'POST') {
         $batch = 'BATCH-01';
         
         // 1. Insert into inventory (0 stock, but available for sale)
-        $stmt = $conn->prepare("INSERT INTO inventory (name, generic_name, mrp, selling_price, purchase_price, stock, category, batch_number) VALUES (?, ?, ?, ?, ?, 0, 'TAB', ?)");
+        $stmt = $conn->prepare("INSERT IGNORE INTO inventory (name, generic_name, mrp, selling_price, purchase_price, stock, category, batch_number) VALUES (?, ?, ?, ?, ?, 0, 'TAB', ?)");
         $stmt->execute([$brand_name, $generic_name, $unit_price, $unit_price, $unit_price, $batch]);
         
         // 2. Insert into agency_items
-        $stmt2 = $conn->prepare("INSERT INTO agency_items (item_name, generic_name, mrp, selling_price, purchase_price, stock, batch_number) VALUES (?, ?, ?, ?, ?, 0, ?)");
+        $stmt2 = $conn->prepare("INSERT IGNORE INTO agency_items (item_name, generic_name, mrp, selling_price, purchase_price, stock, batch_number) VALUES (?, ?, ?, ?, ?, 0, ?)");
         $stmt2->execute([$brand_name, $generic_name, $unit_price, $unit_price, $unit_price, $batch]);
         
         // 3. Update generic mappings
         $stmt3 = $conn->prepare("INSERT INTO generic_mappings (brand_name, generic_name, mrp, stock, batch_number) VALUES (?, ?, ?, 0, ?) ON DUPLICATE KEY UPDATE generic_name = VALUES(generic_name), mrp = VALUES(mrp)");
         $stmt3->execute([$brand_name, $generic_name, $unit_price, $batch]);
         
+    } catch (PDOException $e) {
+        $conn->exec("SELECT RELEASE_LOCK('$lockName')");
+        json_response(['error' => 'Database error: ' . $e->getMessage()], 500);
+    } catch (Exception $e) {
+        $conn->exec("SELECT RELEASE_LOCK('$lockName')");
+        json_response(['error' => 'Error: ' . $e->getMessage()], 500);
     } finally {
         $conn->exec("SELECT RELEASE_LOCK('$lockName')");
     }

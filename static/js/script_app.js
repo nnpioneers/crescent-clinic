@@ -1898,9 +1898,11 @@ window.onunhandledrejection = function(event) {
                             row.querySelector('.med-name').value = newBrand;
                             const wrapper = brandInput.closest('.unmapped-brand-input');
                             if (wrapper) wrapper.remove();
+                        } else {
+                            return toast(res.error || res.message || 'Failed to auto-create brand', 'error');
                         }
                     } catch (e) {
-                        return toast('Failed to auto-create brand for ' + genericName, 'error');
+                        return toast('Error: ' + e.message, 'error');
                     }
                 }
             }
