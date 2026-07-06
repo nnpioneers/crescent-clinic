@@ -1611,14 +1611,8 @@ if ($uri === '/api/inventory/add' && $method === 'POST') {
     // Sync stock to agency items
     sync_stock_item($conn, $name, $batch_number, 'pharmacy');
     
-    // Remove the placeholder unmapped brand record since it is now officially mapped/added
-    if (!empty($generic_name)) {
-        // Find the old placeholder batch (it might be the same batch, or it might be ph_xxx)
-        // If we are editing a placeholder, we should clean up any placeholders for this generic that have 0 stock
-        // to avoid duplicate rows in the View Brands modal.
-        $conn->prepare("DELETE FROM agency_items WHERE LOWER(item_name) = '(unmapped brand)' AND TRIM(LOWER(generic_name)) = TRIM(LOWER(?))")->execute([$generic_name]);
-        $conn->prepare("DELETE FROM generic_mappings WHERE LOWER(brand_name) = '(unmapped brand)' AND TRIM(LOWER(generic_name)) = TRIM(LOWER(?))")->execute([$generic_name]);
-    }
+    // The Without Brand placeholder record must remain permanent even when new brands are added.
+    // Removed the deletion logic here to fix the bug where "Without Brand" disappears.
 
     json_response(['success' => true]);
 }
@@ -1885,11 +1879,8 @@ if ($uri === '/api/inventory/update' && $method === 'POST') {
     // Sync stock to agency items
     sync_stock_item($conn, $name, $batch_number, 'pharmacy');
 
-    // Remove the placeholder unmapped brand record since it is now officially mapped/added
-    if (!empty($generic_name)) {
-        $conn->prepare("DELETE FROM agency_items WHERE LOWER(item_name) = '(unmapped brand)' AND TRIM(LOWER(generic_name)) = TRIM(LOWER(?))")->execute([$generic_name]);
-        $conn->prepare("DELETE FROM generic_mappings WHERE LOWER(brand_name) = '(unmapped brand)' AND TRIM(LOWER(generic_name)) = TRIM(LOWER(?))")->execute([$generic_name]);
-    }
+    // The Without Brand placeholder record must remain permanent even when new brands are added.
+    // Removed the deletion logic here to fix the bug where "Without Brand" disappears.
 
     // Backfill historical zero-cost sales
     $actual_unit_cost = ((int)$tablets_per_strip > 0) ? ((float)$purchase_price / (int)$tablets_per_strip) : (float)$purchase_price;
