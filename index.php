@@ -5,7 +5,7 @@
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
 // Bypass specific API or action endpoints
-if (strpos($uri, '/api') === 0 || strpos($uri, '/reports_api') === 0 || $uri === '/control_access' || $uri === '/logout') {
+if (strpos($uri, '/api') !== false || strpos($uri, '/reports_api') !== false || strpos($uri, '/control_access') !== false || strpos($uri, '/logout') !== false) {
     require __DIR__ . '/api/index.php';
     exit;
 }

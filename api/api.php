@@ -317,7 +317,7 @@ $input = json_decode(file_get_contents('php://input'), true);
 // ==========================================
 // SPA AUTHENTICATION ENDPOINTS
 // ==========================================
-if ($uri === '/api/check-session' && $method === 'GET') {
+if (strpos($uri, '/api/check-session') !== false && $method === 'GET') {
     if (isset($_SESSION['user_id'])) {
         json_response([
             'authenticated' => true,
@@ -335,7 +335,7 @@ if ($uri === '/api/check-session' && $method === 'GET') {
     }
 }
 
-if ($uri === '/api/login' && $method === 'POST') {
+if (strpos($uri, '/api/login') !== false && $method === 'POST') {
     $username = trim($input['username'] ?? '');
     $password = trim($input['password'] ?? '');
 
@@ -388,7 +388,7 @@ if ($uri === '/api/login' && $method === 'POST') {
     }
 }
 
-if ($uri === '/api/logout' && $method === 'POST') {
+if (strpos($uri, '/api/logout') !== false && $method === 'POST') {
     session_destroy();
     json_response(['success' => true]);
 }

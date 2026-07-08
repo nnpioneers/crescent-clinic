@@ -312,12 +312,12 @@ if ($uri === '/control_access') {
     }
 }
 
-if (strpos($uri, '/api/') === 0) {
+if (strpos($uri, '/api') !== false) {
     require_once __DIR__ . '/api.php';
     exit;
 }
 
-if (strpos($uri, '/reports_api') === 0) {
+if (strpos($uri, '/reports_api') !== false) {
     require_once __DIR__ . '/reports_api.php';
     exit;
 }

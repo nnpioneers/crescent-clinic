@@ -30,7 +30,7 @@ if (session_status() === PHP_SESSION_NONE) {
 // Global CSRF Protection for state-changing requests
 if (in_array($_SERVER['REQUEST_METHOD'], ['POST', 'PUT', 'PATCH', 'DELETE'])) {
     $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-    if ($uri !== '/login' && $uri !== '/' && $uri !== '/api/login') {
+    if (strpos($uri, '/login') === false && $uri !== '/') {
         $client_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
         if (empty($client_token) && isset($_POST['csrf_token'])) {
             $client_token = $_POST['csrf_token'];
