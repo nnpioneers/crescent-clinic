@@ -6,13 +6,17 @@ RewriteEngine On
     Deny from all
 </FilesMatch>
 
-# 2. Route API requests
+# 2. Serve React assets directly from frontend/dist if they exist (for performance)
+RewriteCond %{DOCUMENT_ROOT}/frontend/dist%{REQUEST_URI} -f
+RewriteRule ^(.*)$ frontend/dist/$1 [L]
+
+# 3. Route API requests
 RewriteRule ^api/(.*)$ api/api.php [QSA,L]
 
-# 3. Route Report requests
+# 4. Route Report requests
 RewriteRule ^reports/(.*)$ api/reports_api.php [QSA,L]
 
-# 4. Route all other requests to index.php (so /login, /receptionist work properly)
+# 5. Route all other requests to index.php (React SPA Router handles the rest)
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^(.*)$ index.php [QSA,L]
