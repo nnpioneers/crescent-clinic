@@ -314,6 +314,86 @@ $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $method = $_SERVER['REQUEST_METHOD'];
 $input = json_decode(file_get_contents('php://input'), true);
 
+// ==========================================
+// SPA AUTHENTICATION ENDPOINTS
+// ==========================================
+if ($uri === '/api/check-session' && $method === 'GET') {
+    if (isset($_SESSION['user_id'])) {
+        json_response([
+            'authenticated' => true,
+            'csrfToken' => $_SESSION['csrf_token'] ?? '',
+            'user' => [
+                'id' => $_SESSION['user_id'],
+                'username' => $_SESSION['username'],
+                'role' => $_SESSION['role'],
+                'display_name' => $_SESSION['display_name'],
+                'doctor_type' => $_SESSION['doctor_type'] ?? ''
+            ]
+        ]);
+    } else {
+        json_response(['authenticated' => false, 'csrfToken' => $_SESSION['csrf_token'] ?? ''], 401);
+    }
+}
+
+if ($uri === '/api/login' && $method === 'POST') {
+    $username = trim($input['username'] ?? '');
+    $password = trim($input['password'] ?? '');
+
+    $conn = get_db();
+    $stmt = $conn->prepare("SELECT * FROM users WHERE username = ?");
+    $stmt->execute([$username]);
+    $user = $stmt->fetch();
+    
+    $authenticated = false;
+    if ($user) {
+        if (strpos($user['password'], '$2') === 0) {
+            if (password_verify($password, $user['password'])) {
+                $authenticated = true;
+            }
+        } else {
+            if ($user['password'] === $password) {
+                $authenticated = true;
+            }
+        }
+    }
+
+    if ($authenticated) {
+        if ($user['is_active'] == 0) {
+            json_response(['success' => false, 'error' => 'Account is inactive.'], 403);
+        }
+        
+        session_regenerate_id(true);
+        $_SESSION['user_id'] = $user['id'];
+        $_SESSION['username'] = $user['username'];
+        $_SESSION['role'] = $user['role'];
+        $_SESSION['doctor_type'] = $user['doctor_type'];
+        if ($user['role'] === 'doctor') {
+            $_SESSION['doctor_id'] = $user['id'];
+        }
+        $_SESSION['display_name'] = $user['display_name'] ?: $user['username'];
+
+        json_response([
+            'success' => true,
+            'csrfToken' => $_SESSION['csrf_token'] ?? '',
+            'user' => [
+                'id' => $_SESSION['user_id'],
+                'username' => $_SESSION['username'],
+                'role' => $_SESSION['role'],
+                'display_name' => $_SESSION['display_name'],
+                'doctor_type' => $_SESSION['doctor_type']
+            ]
+        ]);
+    } else {
+        json_response(['success' => false, 'error' => 'Invalid credentials'], 401);
+    }
+}
+
+if ($uri === '/api/logout' && $method === 'POST') {
+    session_destroy();
+    json_response(['success' => true]);
+}
+// ==========================================
+
 // Self-healing: Ensure required columns exist for Master Control
 try {
     $conn = get_db();

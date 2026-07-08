@@ -13,6 +13,9 @@ const Login = () => {
     try {
       const response = await axios.post('/api/login', { username, password });
       if (response.data && response.data.success) {
+        if (response.data.csrfToken) {
+          axios.defaults.headers.common['X-CSRF-Token'] = response.data.csrfToken;
+        }
         const role = response.data.role;
         // Redirect based on role
         if (role === 'receptionist') navigate('/receptionist');

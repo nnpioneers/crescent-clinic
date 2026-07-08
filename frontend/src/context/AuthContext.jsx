@@ -14,12 +14,18 @@ export const AuthProvider = ({ children }) => {
     const checkAuth = async () => {
       try {
         const response = await axios.get('/api/check-session');
+        if (response.data && response.data.csrfToken) {
+          axios.defaults.headers.common['X-CSRF-Token'] = response.data.csrfToken;
+        }
         if (response.data && response.data.authenticated) {
           setUser(response.data.user);
         } else {
           setUser(null);
         }
       } catch (err) {
+        if (err.response && err.response.data && err.response.data.csrfToken) {
+          axios.defaults.headers.common['X-CSRF-Token'] = err.response.data.csrfToken;
+        }
         setUser(null);
       } finally {
         setLoading(false);
