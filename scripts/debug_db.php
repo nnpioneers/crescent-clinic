@@ -3,7 +3,7 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 try {
-    $conn = new PDO("mysql:host=127.0.0.1;dbname=u526658771_crescent", "u526658771_nnp", "Namaraja@4");
+    $conn = new PDO("mysql:host=localhost;dbname=u988163119_crescent", "u988163119_nnp", "Namaraja@4");
     $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
     // 1. Check generic_mappings
