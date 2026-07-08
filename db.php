@@ -34,9 +34,9 @@ function get_db()
     }
 
     try {
-        $host = getenv('DB_HOST') ?: '127.0.0.1';
-        $dbname = getenv('DB_NAME') ?: 'u526658771_crescent';
-        $username = getenv('DB_USER') ?: 'u526658771_nnp';
+        $host = getenv('DB_HOST') ?: 'localhost';
+        $dbname = getenv('DB_NAME') ?: 'u988163119_crescent';
+        $username = getenv('DB_USER') ?: 'u988163119_nnp';
         $password = getenv('DB_PASSWORD') ?: 'Namaraja@4';
 
         $max_retries = 3;
