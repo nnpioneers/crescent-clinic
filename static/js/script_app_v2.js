@@ -2052,6 +2052,7 @@ window.onunhandledrejection = function(event) {
         } catch (err) {
             if (waWin) waWin.close();
             console.error('Save Billing Error:', err);
+            throw err;
         }
         
         } catch (outerErr) {
