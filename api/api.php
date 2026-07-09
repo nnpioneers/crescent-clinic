@@ -280,7 +280,7 @@ function sync_stock_item($conn, $item_name, $batch_number, $source) {
                     (int)($p_item['min_stock'] ?? 0),
                     $p_item['generic_name'] ?? '',
                     $p_item['brand_name'] ?? '',
-                    $p_item['supplier_id'] ?? $a_item['supplier_id'],
+                    $p_item['supplier_id'] ?? ($a_item ? ($a_item['supplier_id'] ?? null) : null),
                     $p_item['row_location'] ?? '',
                     $p_item['col_location'] ?? '',
                     $a_item['id']
