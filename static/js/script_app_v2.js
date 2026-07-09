@@ -1331,7 +1331,7 @@ window.onunhandledrejection = function(event) {
                 const renderSuggItem = (item, isFirst, isAddNewBrand, isWithoutBrand) => {
                     const expText = item.expiry_date || 'N/A';
                     const bStr = String(item.batch_number || '');
-                    const batchLabel = (bStr.startsWith('ph_') || bStr.startsWith('manual_')) ? '-' : (bStr || '-');
+                    const batchLabel = (bStr.startsWith('ph_') || bStr.startsWith('manual_') || bStr === 'BATCH-01') ? '-' : (bStr || '-');
                     const stockWarn = item.stock <= (item.min_stock || 0) ? ' ⚠️ LOW' : '';
                     const activeStyle = isFirst ? 'background:var(--bg-hover);' : '';
                     const activeClass = isFirst ? 'active-sugg' : '';

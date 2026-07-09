@@ -1923,7 +1923,7 @@ if ($uri === '/api/inventory/auto_create_brand' && $method === 'POST') {
         $chk2->closeCursor();
         if ($exists_inv) {
             // It's in inventory but maybe not mapped to this generic. Map it.
-            $batch = 'BATCH-01';
+            $batch = 'manual_default';
             $stmt3 = $conn->prepare("INSERT INTO generic_mappings (brand_name, generic_name, mrp, stock, batch_number) VALUES (?, ?, ?, 0, ?) ON DUPLICATE KEY UPDATE generic_name = VALUES(generic_name), mrp = VALUES(mrp)");
             $stmt3->execute([$brand_name, $generic_name, $unit_price, $batch]);
             
@@ -1932,7 +1932,7 @@ if ($uri === '/api/inventory/auto_create_brand' && $method === 'POST') {
         }
         
         // Use a consistent batch number so sync_generic_mappings merges them into 1 row
-        $batch = 'BATCH-01';
+        $batch = 'manual_default';
         
         // 1. Insert into inventory (0 stock, but available for sale)
         $stmt = $conn->prepare("INSERT IGNORE INTO inventory (name, generic_name, mrp, selling_price, purchase_price, stock, category, batch_number) VALUES (?, ?, ?, ?, ?, 0, 'TAB', ?)");
@@ -4914,9 +4914,9 @@ function sync_generic_mappings($conn) {
     // 0. Auto-cleanup duplicates caused by previous race conditions
     try {
         // Fix batch numbers using IGNORE to avoid unique constraint violations
-        $conn->exec("UPDATE IGNORE generic_mappings SET batch_number = 'BATCH-01' WHERE batch_number IS NULL OR batch_number = '-' OR batch_number = ''");
-        $conn->exec("UPDATE IGNORE inventory SET batch_number = 'BATCH-01' WHERE batch_number IS NULL OR batch_number = '-' OR batch_number = ''");
-        $conn->exec("UPDATE IGNORE agency_items SET batch_number = 'BATCH-01' WHERE batch_number IS NULL OR batch_number = '-' OR batch_number = ''");
+        $conn->exec("UPDATE IGNORE generic_mappings SET batch_number = 'manual_default' WHERE batch_number IS NULL OR batch_number = '-' OR batch_number = ''");
+        $conn->exec("UPDATE IGNORE inventory SET batch_number = 'manual_default' WHERE batch_number IS NULL OR batch_number = '-' OR batch_number = ''");
+        $conn->exec("UPDATE IGNORE agency_items SET batch_number = 'manual_default' WHERE batch_number IS NULL OR batch_number = '-' OR batch_number = ''");
 
         // Now delete the TRUE duplicates (where batch numbers are exactly the same)
         $conn->exec("
@@ -4944,22 +4944,22 @@ function sync_generic_mappings($conn) {
               AND ai1.batch_number = ai2.batch_number
         ");
 
-        // Force delete any lingering '-' batches if a 'BATCH-01' already exists for that brand
+        // Force delete any lingering '-' batches if a 'manual_default' already exists for that brand
         // (This handles the case where UPDATE IGNORE skipped them)
         $conn->exec("
             DELETE FROM generic_mappings 
             WHERE (batch_number IS NULL OR batch_number = '-' OR batch_number = '')
-              AND brand_name IN (SELECT * FROM (SELECT brand_name FROM generic_mappings WHERE batch_number = 'BATCH-01') AS tmp)
+              AND brand_name IN (SELECT * FROM (SELECT brand_name FROM generic_mappings WHERE batch_number = 'manual_default') AS tmp)
         ");
         $conn->exec("
             DELETE FROM inventory 
             WHERE (batch_number IS NULL OR batch_number = '-' OR batch_number = '')
-              AND name IN (SELECT * FROM (SELECT name FROM inventory WHERE batch_number = 'BATCH-01') AS tmp)
+              AND name IN (SELECT * FROM (SELECT name FROM inventory WHERE batch_number = 'manual_default') AS tmp)
         ");
         $conn->exec("
             DELETE FROM agency_items 
             WHERE (batch_number IS NULL OR batch_number = '-' OR batch_number = '')
-              AND item_name IN (SELECT * FROM (SELECT item_name FROM agency_items WHERE batch_number = 'BATCH-01') AS tmp)
+              AND item_name IN (SELECT * FROM (SELECT item_name FROM agency_items WHERE batch_number = 'manual_default') AS tmp)
         ");
 
     } catch (Exception $e) {

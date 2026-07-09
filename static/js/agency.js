@@ -2009,8 +2009,8 @@ async function gmViewBrands(genericName) {
                 statusBadge = `<span class="badge" style="background:var(--emerald-light); color:var(--emerald); font-weight:600; padding:4px 8px;">In Stock</span>`;
             }
 
-            const bNumTable = brand.batch_number || '';
-            const displayBatchTable = (bNumTable.startsWith('ph_') || bNumTable.startsWith('manual_')) ? '-' : (bNumTable || '-');
+            const bNumTable = String(brand.batch_number || '');
+            const displayBatchTable = (bNumTable.startsWith('ph_') || bNumTable.startsWith('manual_') || bNumTable === 'BATCH-01') ? '-' : (bNumTable || '-');
 
             return `
                 <tr>
@@ -2062,8 +2062,8 @@ window.gmOpenEditModal = function(encodedBrand) {
         : (brand.brand_name || '');
     // ─────────────────────────────────────────────────────────────────────────
 
-    const bNum = brand.batch_number || '';
-    const displayBatch = (bNum.startsWith('ph_') || bNum.startsWith('manual_')) ? '' : bNum;
+    const bNum = String(brand.batch_number || '');
+    const displayBatch = (bNum.startsWith('ph_') || bNum.startsWith('manual_') || bNum === 'BATCH-01') ? '' : bNum;
 
     const item = {
         id: brand.inventory_id || '',
