@@ -1330,7 +1330,7 @@ window.onunhandledrejection = function(event) {
             if (items.length > 0) {
                 const renderSuggItem = (item, isFirst, isAddNewBrand, isWithoutBrand) => {
                     const expText = item.expiry_date || 'N/A';
-                    const bStr = item.batch_number || '';
+                    const bStr = String(item.batch_number || '');
                     const batchLabel = (bStr.startsWith('ph_') || bStr.startsWith('manual_')) ? '-' : (bStr || '-');
                     const stockWarn = item.stock <= (item.min_stock || 0) ? ' ⚠️ LOW' : '';
                     const activeStyle = isFirst ? 'background:var(--bg-hover);' : '';
@@ -2057,6 +2057,7 @@ window.onunhandledrejection = function(event) {
         
         } catch (outerErr) {
             console.error('Submit Medicines Error:', outerErr);
+            toast(outerErr.message || 'An unexpected error occurred during save', 'error');
         } finally {
             saveBtns.forEach(btn => btn.disabled = false);
         }
