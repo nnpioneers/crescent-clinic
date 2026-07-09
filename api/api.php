@@ -1348,7 +1348,7 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     // }
     
     if ($category === 'medicine') {
-        $conditions[] = "i.category NOT IN ('Injection', 'INJ', 'IV')";
+        $conditions[] = "(i.category IS NULL OR i.category NOT IN ('Injection', 'INJ', 'IV'))";
     } elseif ($category === 'Injection' || $category === 'INJ') {
         $conditions[] = "i.category IN ('Injection', 'INJ')";
     } elseif ($category) {
@@ -1377,7 +1377,7 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
         $gm_params[] = strtolower("%$q%");
     }
     if ($category === 'medicine') {
-        $gm_conditions[] = "category NOT IN ('Injection', 'INJ', 'IV')";
+        $gm_conditions[] = "(category IS NULL OR category NOT IN ('Injection', 'INJ', 'IV'))";
     } elseif ($category === 'Injection' || $category === 'INJ') {
         $gm_conditions[] = "category IN ('Injection', 'INJ')";
     } elseif ($category) {
@@ -1407,7 +1407,7 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
         $ai_conditions = ["LOWER(item_name) = '(unmapped brand)'", "generic_name IS NOT NULL", "TRIM(generic_name) != ''", "LOWER(generic_name) LIKE ?"];
         $ai_params     = [strtolower("%$q%")];
         if ($category === 'medicine') {
-            $ai_conditions[] = "category NOT IN ('Injection', 'INJ', 'IV')";
+            $ai_conditions[] = "(category IS NULL OR category NOT IN ('Injection', 'INJ', 'IV'))";
         } elseif ($category === 'Injection' || $category === 'INJ') {
             $ai_conditions[] = "category IN ('Injection', 'INJ')";
         } elseif ($category) {
