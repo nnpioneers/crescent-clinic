@@ -36,7 +36,7 @@ if (!function_exists('json_response')) {
         }
         header('Content-Type: application/json');
         http_response_code($status);
-        echo json_encode($data);
+        echo json_encode($data, JSON_INVALID_UTF8_SUBSTITUTE);
         exit;
     }
 }
