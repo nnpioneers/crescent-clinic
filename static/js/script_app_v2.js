@@ -1330,7 +1330,8 @@ window.onunhandledrejection = function(event) {
             if (items.length > 0) {
                 const renderSuggItem = (item, isFirst, isAddNewBrand, isWithoutBrand) => {
                     const expText = item.expiry_date || 'N/A';
-                    const batchLabel = item.batch_number || '-';
+                    const bStr = item.batch_number || '';
+                    const batchLabel = (bStr.startsWith('ph_') || bStr.startsWith('manual_')) ? '-' : (bStr || '-');
                     const stockWarn = item.stock <= (item.min_stock || 0) ? ' ⚠️ LOW' : '';
                     const activeStyle = isFirst ? 'background:var(--bg-hover);' : '';
                     const activeClass = isFirst ? 'active-sugg' : '';

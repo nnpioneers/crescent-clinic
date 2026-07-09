@@ -2009,13 +2009,16 @@ async function gmViewBrands(genericName) {
                 statusBadge = `<span class="badge" style="background:var(--emerald-light); color:var(--emerald); font-weight:600; padding:4px 8px;">In Stock</span>`;
             }
 
+            const bNumTable = brand.batch_number || '';
+            const displayBatchTable = (bNumTable.startsWith('ph_') || bNumTable.startsWith('manual_')) ? '-' : (bNumTable || '-');
+
             return `
                 <tr>
                     <td>${idx + 1}</td>
                     <td><strong>${brand.brand_name}</strong></td>
                     <td>${brand.supplier_name || 'Direct / Unknown'}</td>
                     <td><span style="font-weight:600; ${stock <= 0 ? 'color:var(--danger);' : 'color:var(--emerald);'}">${stock}</span></td>
-                    <td><span class="badge" style="background:var(--bg-secondary); color:var(--text-primary); font-family:monospace;">${brand.batch_number || '-'}</span></td>
+                    <td><span class="badge" style="background:var(--bg-secondary); color:var(--text-primary); font-family:monospace;">${displayBatchTable}</span></td>
                     <td>₹${parseFloat(brand.mrp || 0).toFixed(2)}</td>
                     <td>${brand.expiry_date || '-'}</td>
                     <td>${brand.pack_size || '-'}</td>
@@ -2059,13 +2062,16 @@ window.gmOpenEditModal = function(encodedBrand) {
         : (brand.brand_name || '');
     // ─────────────────────────────────────────────────────────────────────────
 
+    const bNum = brand.batch_number || '';
+    const displayBatch = (bNum.startsWith('ph_') || bNum.startsWith('manual_')) ? '' : bNum;
+
     const item = {
         id: brand.inventory_id || '',
         name: realName,
         category: brand.category || 'TAB',
         item_code: brand.item_code || '',
         hsn_code: brand.hsn_code || '',
-        batch_number: brand.batch_number || '',
+        batch_number: displayBatch,
         mfg_date: brand.mfg_date || '',
         expiry_date: brand.expiry_date || '',
         purchase_price: brand.purchase_price || 0,
