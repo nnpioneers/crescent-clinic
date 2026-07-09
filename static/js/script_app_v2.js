@@ -1069,9 +1069,6 @@ window.onunhandledrejection = function(event) {
         // Ensure UPI accounts are loaded before showing form
         await window.loadGlobalUpiAccounts();
 
-        // Pre-load medicine cache in background so first keystroke is instant
-        if (!pharmacyCacheLoaded) loadPharmacyMedCache();
-
         $('#medModalPatient').textContent = name;
         $('#medModalDiag').textContent = diag || '-';
         $('#medModalPresc').textContent = presc || '-';
@@ -2132,9 +2129,6 @@ window.onunhandledrejection = function(event) {
 
         // Ensure UPI accounts are loaded before showing form
         await window.loadGlobalUpiAccounts();
-
-        // Pre-load medicine cache in background so first keystroke is instant
-        if (!pharmacyCacheLoaded) loadPharmacyMedCache();
 
         $('#medModalPatient').textContent = 'Direct Medicine Sale';
         $('#medModalDiag').textContent = '-';
