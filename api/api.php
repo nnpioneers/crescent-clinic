@@ -1336,7 +1336,7 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     $conditions = [];
     
     if ($q) {
-        $conditions[] = "(i.name LIKE ? OR i.generic_name LIKE ? OR i.item_code LIKE ? OR i.batch_number LIKE ?)";
+        $conditions[] = "(LOWER(i.name) LIKE LOWER(?) OR LOWER(i.generic_name) LIKE LOWER(?) OR LOWER(i.item_code) LIKE LOWER(?) OR LOWER(i.batch_number) LIKE LOWER(?))";
         $params[] = "%$q%";
         $params[] = "%$q%";
         $params[] = "%$q%";
@@ -1359,7 +1359,12 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     if ($conditions) {
         $query .= " WHERE " . implode(" AND ", $conditions);
     }
-    $query .= " ORDER BY i.name ASC";
+    if ($q) {
+        $query .= " ORDER BY CASE WHEN LOWER(i.name) LIKE LOWER(?) THEN 0 ELSE 1 END, i.name ASC LIMIT 100";
+        $params[] = "$q%";
+    } else {
+        $query .= " ORDER BY i.name ASC LIMIT 100";
+    }
     
     $stmt = $conn->prepare($query);
     $stmt->execute($params);
@@ -1368,7 +1373,7 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     $gm_conditions = [];
     $gm_params = [];
     if ($q) {
-        $gm_conditions[] = "generic_name LIKE ?";
+        $gm_conditions[] = "LOWER(generic_name) LIKE LOWER(?)";
         $gm_params[] = "%$q%";
     }
     if ($category === 'medicine') {
@@ -1384,7 +1389,14 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     if ($gm_conditions) {
         $gm_query .= " WHERE " . implode(" AND ", $gm_conditions);
     }
-    $gm_query .= " ORDER BY generic_name ASC LIMIT 30";
+    // Prioritize prefix matches
+    if ($q) {
+        $gm_query .= " ORDER BY CASE WHEN LOWER(generic_name) LIKE LOWER(?) THEN 0 ELSE 1 END, generic_name ASC LIMIT 30";
+        // We need to add $q to params for the ORDER BY clause
+        $gm_params[] = "$q%";
+    } else {
+        $gm_query .= " ORDER BY generic_name ASC LIMIT 30";
+    }
     
     $stmt2 = $conn->prepare($gm_query);
     $stmt2->execute($gm_params);
@@ -1393,7 +1405,7 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     // ── BUG FIX: Also pick up generics that exist in agency_items but have not
     // yet been synced into generic_mappings (e.g. just created via /api/generics/add).
     if ($q) {
-        $ai_conditions = ["LOWER(item_name) = '(unmapped brand)'", "generic_name IS NOT NULL", "TRIM(generic_name) != ''", "generic_name LIKE ?"];
+        $ai_conditions = ["LOWER(item_name) = '(unmapped brand)'", "generic_name IS NOT NULL", "TRIM(generic_name) != ''", "LOWER(generic_name) LIKE LOWER(?)"];
         $ai_params     = ["%$q%"];
         if ($category === 'medicine') {
             $ai_conditions[] = "category NOT IN ('Injection', 'INJ', 'IV')";
@@ -1403,7 +1415,8 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
             $ai_conditions[] = "category = ?";
             $ai_params[] = $category;
         }
-        $ai_query = "SELECT DISTINCT generic_name FROM agency_items WHERE " . implode(" AND ", $ai_conditions) . " ORDER BY generic_name ASC LIMIT 30";
+        $ai_query = "SELECT DISTINCT generic_name FROM agency_items WHERE " . implode(" AND ", $ai_conditions) . " ORDER BY CASE WHEN LOWER(generic_name) LIKE LOWER(?) THEN 0 ELSE 1 END, generic_name ASC LIMIT 30";
+        $ai_params[] = "$q%";
         $stmt_ai = $conn->prepare($ai_query);
         $stmt_ai->execute($ai_params);
         $ai_generics = $stmt_ai->fetchAll(PDO::FETCH_COLUMN);
@@ -1441,7 +1454,7 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
 
     // Load matching batches directly if search is empty or we want to populate the sub-results
     if ($q) {
-        $brand_query = "SELECT i.*, COALESCE(NULLIF(i.agency_name,''), s.name) as agency_name FROM inventory i LEFT JOIN agency_suppliers s ON i.supplier_id = s.id WHERE i.generic_name IN (SELECT DISTINCT generic_name FROM generic_mappings WHERE generic_name LIKE ?)";
+        $brand_query = "SELECT i.*, COALESCE(NULLIF(i.agency_name,''), s.name) as agency_name FROM inventory i LEFT JOIN agency_suppliers s ON i.supplier_id = s.id WHERE LOWER(i.generic_name) IN (SELECT DISTINCT LOWER(generic_name) FROM generic_mappings WHERE LOWER(generic_name) LIKE LOWER(?)) LIMIT 300";
         $stmt_brands = $conn->prepare($brand_query);
         $stmt_brands->execute(["%$q%"]);
         $brand_batches = $stmt_brands->fetchAll(PDO::FETCH_ASSOC);
