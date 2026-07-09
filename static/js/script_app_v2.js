@@ -1515,7 +1515,9 @@ window.onunhandledrejection = function(event) {
                 });
 
                 let html = '', idx = 0;
-                for (const g in groups) {
+                // Sort the groups alphabetically by generic/item name
+                const sortedKeys = Object.keys(groups).sort((a, b) => a.localeCompare(b));
+                for (const g of sortedKeys) {
                     const grp = groups[g];
                     const unm = grp.find(i => i.is_generic_header == 1);
                     const wb  = grp.find(i => i.is_actual_without_brand == 1);
