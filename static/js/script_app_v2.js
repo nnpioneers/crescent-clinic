@@ -1687,7 +1687,7 @@ window.onunhandledrejection = function(event) {
         const suggBox = inputEl.nextElementSibling;
         if (!suggBox || !suggBox.classList.contains('med-suggestions')) return;
 
-        if (q.length < 2) {
+        if (!q) {
             suggBox.style.display = 'none';
             return;
         }
@@ -3691,7 +3691,7 @@ window.searchGenericNames = async function (inputEl) {
         inputEl.parentNode.style.position = 'relative';
     }
 
-    if (q.length < 2) {
+    if (!q) {
         suggBox.style.display = 'none';
         return;
     }

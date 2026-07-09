@@ -141,7 +141,7 @@
         async function suggestInvMedicine(input) {
             const q = input.value.trim();
             const suggBox = document.getElementById('invSuggestions');
-            if (q.length < 2) {
+            if (!q) {
                 suggBox.style.display = 'none';
                 return;
             }
