@@ -963,6 +963,9 @@ window.onunhandledrejection = function(event) {
         // Ensure UPI accounts are loaded before showing form
         await window.loadGlobalUpiAccounts();
 
+        // Pre-load medicine cache in background so first keystroke is instant
+        if (!pharmacyCacheLoaded) loadPharmacyMedCache();
+
         $('#medModalPatient').textContent = name;
         $('#medModalDiag').textContent = diag || '-';
         $('#medModalPresc').textContent = presc || '-';
@@ -1306,190 +1309,192 @@ window.onunhandledrejection = function(event) {
         setTimeout(() => { row.querySelector('.inj-name').focus(); }, 10);
     };
 
-    let searchMedicineTimeout = null;
-    window.searchMedicine = async function (inputEl) {
-        clearTimeout(searchMedicineTimeout);
-        searchMedicineTimeout = setTimeout(async () => {
-            const q = inputEl.value.trim();
-            const row = inputEl.closest('.medicine-row');
-            const suggBox = row.querySelector('.med-suggestions');
+    // ─── Client-side medicine cache (loaded once, filtered instantly like Inventory Items tab) ───
+    let pharmacyMedCache = [];   // all medicine items from backend
+    let pharmacyCacheLoaded = false;
 
-            if (q.length < 1) {
-                suggBox.style.display = 'none';
-                return;
-            }
-
+    async function loadPharmacyMedCache() {
         try {
-            const isPharmacy = inputEl.id.startsWith('pharmacy') || inputEl.closest('#medicineRows');
-            const url = isPharmacy ? '/api/inventory/search?category=medicine&q=' + encodeURIComponent(q) : '/api/inventory/search?q=' + encodeURIComponent(q);
-            const items = await api(url);
-            // Cache results for quick calculation
-            items.forEach(item => {
-                medDataCache[item.name.toLowerCase()] = {
-                    price: item.selling_price,
-                    tps: item.tablets_per_strip || 0
-                };
-            });
-            if (items.length > 0) {
-                const renderSuggItem = (item, isFirst, isAddNewBrand, isWithoutBrand) => {
-                    const expText = item.expiry_date || 'N/A';
-                    const bStr = String(item.batch_number || '');
-                    const batchLabel = (bStr.startsWith('ph_') || bStr.startsWith('manual_') || bStr === 'BATCH-01') ? '-' : (bStr || '-');
-                    const stockWarn = item.stock <= (item.min_stock || 0) ? ' ⚠️ LOW' : '';
-                    const activeStyle = isFirst ? 'background:var(--bg-hover);' : '';
-                    const activeClass = isFirst ? 'active-sugg' : '';
-
-                    if (isAddNewBrand) {
-                        return `
-                        <div class="med-sugg-item ${activeClass}" style="padding:12px; cursor:pointer; border-bottom:1px solid var(--border); transition: background 0.15s; ${activeStyle}" 
-                             onmouseenter="this.parentElement.querySelectorAll('.med-sugg-item').forEach(i => {i.classList.remove('active-sugg'); i.style.background=''}); this.classList.add('active-sugg'); this.style.background='var(--bg-hover)';"
-                             onmouseleave="this.classList.remove('active-sugg'); this.style.background=''"
-                             onclick="selectMedicine(this, '${item.name.replace(/'/g, "\\'")}', ${item.selling_price || 0}, ${item.id}, ${item.tablets_per_strip || 0}, 1)">
-                            <div style="font-weight:600; color:#3b82f6; font-size:0.95em;">
-                                + Add New Brand
-                            </div>
-                        </div>`;
-                    }
-
-                    let cat = (item.category || '').toUpperCase();
-                    let nameUpper = (item.name || '').toUpperCase();
-
-                    let priceLabel = '';
-                    let stockLabel = '';
-                    let extraLabel = '';
-
-                    let isTablet = cat.includes('TAB') || cat.includes('CAP') || nameUpper.includes('TAB') || nameUpper.includes('CAP');
-                    let isSyrup = cat.includes('SYP') || cat.includes('SYRUP') || nameUpper.includes('SYP') || nameUpper.includes('SYRUP');
-                    let isInjection = cat.includes('INJ') || nameUpper.includes('INJ');
-                    let isOintment = cat.includes('OINT') || cat.includes('CREAM') || cat.includes('DROP') || nameUpper.includes('OINT') || nameUpper.includes('CREAM') || nameUpper.includes('DROP');
-                    let isPowder = cat.includes('POW') || cat.includes('GRANULE') || nameUpper.includes('POW') || nameUpper.includes('GRANULE');
-
-                    let matchVolume = item.name.match(/(\d+(\.\d+)?\s*(ml|l|gm|mg|kg|oz))/i);
-                    let extText = matchVolume ? matchVolume[0] : 'N/A';
-
-                    if (isTablet) {
-                        let tps = parseInt(item.tablets_per_strip) || 1;
-                        let strips = Math.floor(item.stock / tps);
-                        let loose = item.stock % tps;
-                        let stockText = strips + ' Strips';
-                        if (loose > 0) stockText += ` + ${loose} Tabs`;
-                        stockText += stockWarn;
-
-                        priceLabel = `MRP : ₹${parseFloat(item.mrp || item.selling_price || 0).toFixed(2)} / Strip`;
-                        stockLabel = `Stock : ${stockText}`;
-                        extraLabel = `Pack : ${tps} Tablets / Strip`;
-                    } else if (isSyrup) {
-                        priceLabel = `MRP : ₹${parseFloat(item.mrp || item.selling_price || 0).toFixed(2)} / Bottle`;
-                        stockLabel = `Stock : ${item.stock} Bottles${stockWarn}`;
-                        extraLabel = `Volume : ${extText}`;
-                    } else if (isInjection) {
-                        priceLabel = `MRP : ₹${parseFloat(item.mrp || item.selling_price || 0).toFixed(2)} / Vial`;
-                        stockLabel = `Stock : ${item.stock} Vials${stockWarn}`;
-                        extraLabel = `Volume : ${extText}`;
-                    } else if (isOintment) {
-                        priceLabel = `MRP : ₹${parseFloat(item.mrp || item.selling_price || 0).toFixed(2)} / Tube`;
-                        stockLabel = `Stock : ${item.stock} Tubes${stockWarn}`;
-                        extraLabel = `Weight : ${extText}`;
-                    } else if (isPowder) {
-                        priceLabel = `MRP : ₹${parseFloat(item.mrp || item.selling_price || 0).toFixed(2)} / Jar`;
-                        stockLabel = `Stock : ${item.stock} Jars${stockWarn}`;
-                        extraLabel = `Weight : ${extText}`;
-                    } else {
-                        let catName = item.category ? item.category : 'Unit';
-                        let pluralCat = catName;
-                        if (!pluralCat.toLowerCase().endsWith('s')) {
-                            pluralCat += 's';
-                        }
-                        priceLabel = `MRP : ₹${parseFloat(item.mrp || item.selling_price || 0).toFixed(2)} / ${catName}`;
-                        stockLabel = `Stock : ${item.stock} ${pluralCat}${stockWarn}`;
-                        extraLabel = `Pack : ${item.tablets_per_strip || 1} ${pluralCat} / Pack`;
-                    }
-
-                    let bullet = isWithoutBrand ? '' : '• ';
-
-                    return `
-                    <div class="med-sugg-item ${activeClass}" style="padding:10px 12px; cursor:pointer; border-bottom:1px solid var(--border); transition: background 0.15s; ${activeStyle}" 
-                         onmouseenter="this.parentElement.querySelectorAll('.med-sugg-item').forEach(i => {i.classList.remove('active-sugg'); i.style.background=''}); this.classList.add('active-sugg'); this.style.background='var(--bg-hover)';"
-                         onmouseleave="this.classList.remove('active-sugg'); this.style.background=''"
-                         onclick="selectMedicine(this, '${item.name.replace(/'/g, "\\'")}', ${item.selling_price || 0}, ${item.id}, ${item.tablets_per_strip || 0}, 0)">
-                        <div style="font-weight:700; color:var(--text-primary); margin-bottom:2px; font-size:0.95em; letter-spacing:0.02em;">
-                            <span style="color:var(--text-secondary); font-weight:normal; margin-right:4px;">${bullet}</span>${item.name}
-                        </div>
-                        ${item.agency_name ? `<div style="font-size:0.8em; color:var(--text-secondary); margin-bottom:4px; margin-left: ${isWithoutBrand ? '0' : '12px'};">Agency : ${item.agency_name}</div>` : ''}
-                        <div style="font-size:0.8em; color:var(--text-secondary); margin-bottom:4px; display:flex; flex-direction:column; gap:2px; margin-left: ${isWithoutBrand ? '0' : '12px'};">
-                            <span>Batch No : ${batchLabel}</span>
-                            <span>Expiry : ${expText}</span>
-                        </div>
-                        <div style="font-size:0.78rem; color:var(--text-secondary); display:flex; flex-direction:column; gap:3px;">
-                            <span>${priceLabel}</span>
-                            <span>${stockLabel}</span>
-                            <span>${extraLabel}</span>
-                            ${item.row_location ? `<span>Row : ${item.row_location}</span>` : ''}
-                            ${item.col_location ? `<span>Column : ${item.col_location}</span>` : ''}
-                        </div>
-                    </div>`;
-                };
-
-                let groupedItems = {};
-                items.forEach(item => {
-                    let gName = item.generic_name || item.name;
-                    if (!groupedItems[gName]) groupedItems[gName] = [];
-                    groupedItems[gName].push(item);
-                });
-
-                let html = '';
-                let idx = 0;
-                for (let gName in groupedItems) {
-                    let group = groupedItems[gName];
-                    let withoutBrandItem = group.find(i => i.is_actual_without_brand == 1);
-                    let unmappedPlaceholder = group.find(i => i.is_unmapped == 1);
-                    let brandItems = group.filter(i => i.is_actual_without_brand != 1 && i.is_unmapped != 1);
-
-                    if (unmappedPlaceholder) {
-                        // 1. Original Generic Item Result
-                        html += `
-                        <div class="med-sugg-item ${idx === 0 ? 'active-sugg' : ''}" style="padding:10px 12px; cursor:pointer; border-bottom:1px solid var(--border); transition: background 0.15s; ${idx === 0 ? 'background:var(--bg-hover);' : ''}" 
-                             onmouseenter="this.parentElement.querySelectorAll('.med-sugg-item').forEach(i => {i.classList.remove('active-sugg'); i.style.background=''}); this.classList.add('active-sugg'); this.style.background='var(--bg-hover)';"
-                             onmouseleave="this.classList.remove('active-sugg'); this.style.background=''"
-                             onclick="selectMedicine(this, '${unmappedPlaceholder.name.replace(/'/g, "\\'")}', ${unmappedPlaceholder.selling_price || 0}, ${unmappedPlaceholder.id}, ${unmappedPlaceholder.tablets_per_strip || 0}, 1)">
-                            <div style="font-weight:700; color:var(--text-primary); margin-bottom:2px; font-size:1em; letter-spacing:0.02em;">
-                                ${unmappedPlaceholder.name}
-                            </div>
-                            <div style="font-size:0.8em; color:#6366f1; font-style:italic; margin-bottom:4px; font-weight:600;">Generic Medicine</div>
-                            <div style="font-size:0.85em; font-weight:500; color:var(--text-secondary); margin-top:2px;">Brands: ${unmappedPlaceholder.brand_count !== undefined ? unmappedPlaceholder.brand_count : 0}</div>
-                        </div>`;
-                        idx++;
-                    }
-
-                    // 2. Without Brand
-                    if (withoutBrandItem) {
-                        html += renderSuggItem(withoutBrandItem, idx === 0, false, true);
-                        idx++;
-                    }
-                    
-                    // 3. Existing Brands
-                    if (brandItems.length > 0) {
-                        brandItems.forEach(b => {
-                            html += renderSuggItem(b, idx === 0, false, false);
-                            idx++;
-                        });
-                    }
-                    
-                    // 4. Add New Brand Option (Always present if unmappedPlaceholder exists, because unmappedPlaceholder represents the generic item group)
-                    if (unmappedPlaceholder) {
-                        html += renderSuggItem(unmappedPlaceholder, false, true, false);
-                    }
-                }
-                suggBox.innerHTML = html;
-                suggBox.style.display = 'block';
-            } else {
-                suggBox.style.display = 'none';
-            }
+            const items = await api('/api/inventory/search?category=medicine&q=&all=1');
+            pharmacyMedCache = items || [];
+            pharmacyCacheLoaded = true;
         } catch (e) {
-            console.error(e);
+            console.error('Failed to load medicine cache:', e);
+            pharmacyCacheLoaded = false;
         }
-        }, 300); // 300ms debounce
+    }
+
+    // Build the grouped suggestion HTML from a flat list of inventory items
+    function buildSuggestionHTML(items) {
+        const renderSuggItem = (item, isFirst, isAddNewBrand, isWithoutBrand) => {
+            const expText = item.expiry_date || 'N/A';
+            const bStr = String(item.batch_number || '');
+            const batchLabel = (bStr.startsWith('ph_') || bStr.startsWith('manual_') || bStr === 'BATCH-01') ? '-' : (bStr || '-');
+            const stockWarn = item.stock <= (item.min_stock || 0) ? ' ⚠️ LOW' : '';
+            const activeStyle = isFirst ? 'background:var(--bg-hover);' : '';
+            const activeClass = isFirst ? 'active-sugg' : '';
+
+            if (isAddNewBrand) {
+                return `
+                <div class="med-sugg-item ${activeClass}" style="padding:12px; cursor:pointer; border-bottom:1px solid var(--border); transition: background 0.15s; ${activeStyle}" 
+                     onmouseenter="this.parentElement.querySelectorAll('.med-sugg-item').forEach(i => {i.classList.remove('active-sugg'); i.style.background=''}); this.classList.add('active-sugg'); this.style.background='var(--bg-hover)';"
+                     onmouseleave="this.classList.remove('active-sugg'); this.style.background=''"
+                     onclick="selectMedicine(this, '${item.name.replace(/'/g, "\\'")}', ${item.selling_price || 0}, ${item.id}, ${item.tablets_per_strip || 0}, 1)">
+                    <div style="font-weight:600; color:#3b82f6; font-size:0.95em;">
+                        + Add New Brand
+                    </div>
+                </div>`;
+            }
+
+            let cat = (item.category || '').toUpperCase();
+            let nameUpper = (item.name || '').toUpperCase();
+            let priceLabel = '', stockLabel = '', extraLabel = '';
+            let isTablet = cat.includes('TAB') || cat.includes('CAP') || nameUpper.includes('TAB') || nameUpper.includes('CAP');
+            let isSyrup = cat.includes('SYP') || cat.includes('SYRUP') || nameUpper.includes('SYP') || nameUpper.includes('SYRUP');
+            let isInjection = cat.includes('INJ') || nameUpper.includes('INJ');
+            let isOintment = cat.includes('OINT') || cat.includes('CREAM') || cat.includes('DROP') || nameUpper.includes('OINT') || nameUpper.includes('CREAM') || nameUpper.includes('DROP');
+            let isPowder = cat.includes('POW') || cat.includes('GRANULE') || nameUpper.includes('POW') || nameUpper.includes('GRANULE');
+            let matchVolume = item.name.match(/(\d+(\.\d+)?\s*(ml|l|gm|mg|kg|oz))/i);
+            let extText = matchVolume ? matchVolume[0] : 'N/A';
+
+            if (isTablet) {
+                let tps = parseInt(item.tablets_per_strip) || 1;
+                let strips = Math.floor(item.stock / tps);
+                let loose = item.stock % tps;
+                let stockText = strips + ' Strips';
+                if (loose > 0) stockText += ` + ${loose} Tabs`;
+                stockText += stockWarn;
+                priceLabel = `MRP : ₹${parseFloat(item.mrp || item.selling_price || 0).toFixed(2)} / Strip`;
+                stockLabel = `Stock : ${stockText}`;
+                extraLabel = `Pack : ${tps} Tablets / Strip`;
+            } else if (isSyrup) {
+                priceLabel = `MRP : ₹${parseFloat(item.mrp || item.selling_price || 0).toFixed(2)} / Bottle`;
+                stockLabel = `Stock : ${item.stock} Bottles${stockWarn}`;
+                extraLabel = `Volume : ${extText}`;
+            } else if (isInjection) {
+                priceLabel = `MRP : ₹${parseFloat(item.mrp || item.selling_price || 0).toFixed(2)} / Vial`;
+                stockLabel = `Stock : ${item.stock} Vials${stockWarn}`;
+                extraLabel = `Volume : ${extText}`;
+            } else if (isOintment) {
+                priceLabel = `MRP : ₹${parseFloat(item.mrp || item.selling_price || 0).toFixed(2)} / Tube`;
+                stockLabel = `Stock : ${item.stock} Tubes${stockWarn}`;
+                extraLabel = `Weight : ${extText}`;
+            } else if (isPowder) {
+                priceLabel = `MRP : ₹${parseFloat(item.mrp || item.selling_price || 0).toFixed(2)} / Jar`;
+                stockLabel = `Stock : ${item.stock} Jars${stockWarn}`;
+                extraLabel = `Weight : ${extText}`;
+            } else {
+                let catName = item.category ? item.category : 'Unit';
+                let pluralCat = catName.toLowerCase().endsWith('s') ? catName : catName + 's';
+                priceLabel = `MRP : ₹${parseFloat(item.mrp || item.selling_price || 0).toFixed(2)} / ${catName}`;
+                stockLabel = `Stock : ${item.stock} ${pluralCat}${stockWarn}`;
+                extraLabel = `Pack : ${item.tablets_per_strip || 1} ${pluralCat} / Pack`;
+            }
+
+            let bullet = isWithoutBrand ? '' : '• ';
+            return `
+            <div class="med-sugg-item ${activeClass}" style="padding:10px 12px; cursor:pointer; border-bottom:1px solid var(--border); transition: background 0.15s; ${activeStyle}" 
+                 onmouseenter="this.parentElement.querySelectorAll('.med-sugg-item').forEach(i => {i.classList.remove('active-sugg'); i.style.background=''}); this.classList.add('active-sugg'); this.style.background='var(--bg-hover)';"
+                 onmouseleave="this.classList.remove('active-sugg'); this.style.background=''"
+                 onclick="selectMedicine(this, '${item.name.replace(/'/g, "\\'")}', ${item.selling_price || 0}, ${item.id}, ${item.tablets_per_strip || 0}, 0)">
+                <div style="font-weight:700; color:var(--text-primary); margin-bottom:2px; font-size:0.95em; letter-spacing:0.02em;">
+                    <span style="color:var(--text-secondary); font-weight:normal; margin-right:4px;">${bullet}</span>${item.name}
+                </div>
+                ${item.agency_name ? `<div style="font-size:0.8em; color:var(--text-secondary); margin-bottom:4px; margin-left: ${isWithoutBrand ? '0' : '12px'};">Agency : ${item.agency_name}</div>` : ''}
+                <div style="font-size:0.8em; color:var(--text-secondary); margin-bottom:4px; display:flex; flex-direction:column; gap:2px; margin-left: ${isWithoutBrand ? '0' : '12px'};">
+                    <span>Batch No : ${batchLabel}</span>
+                    <span>Expiry : ${expText}</span>
+                </div>
+                <div style="font-size:0.78rem; color:var(--text-secondary); display:flex; flex-direction:column; gap:3px;">
+                    <span>${priceLabel}</span>
+                    <span>${stockLabel}</span>
+                    <span>${extraLabel}</span>
+                    ${item.row_location ? `<span>Row : ${item.row_location}</span>` : ''}
+                    ${item.col_location ? `<span>Column : ${item.col_location}</span>` : ''}
+                </div>
+            </div>`;
+        };
+
+        if (!items || items.length === 0) return '';
+
+        // Group by generic_name
+        let groupedItems = {};
+        items.forEach(item => {
+            const gName = item.generic_name || item.name;
+            if (!groupedItems[gName]) groupedItems[gName] = [];
+            groupedItems[gName].push(item);
+        });
+
+        let html = '';
+        let idx = 0;
+        for (const gName in groupedItems) {
+            let group = groupedItems[gName];
+            let withoutBrandItem = group.find(i => i.is_actual_without_brand == 1);
+            let unmappedPlaceholder = group.find(i => i.is_unmapped == 1);
+            let brandItems = group.filter(i => i.is_actual_without_brand != 1 && i.is_unmapped != 1);
+
+            if (unmappedPlaceholder) {
+                html += `
+                <div class="med-sugg-item ${idx === 0 ? 'active-sugg' : ''}" style="padding:10px 12px; cursor:pointer; border-bottom:1px solid var(--border); transition: background 0.15s; ${idx === 0 ? 'background:var(--bg-hover);' : ''}" 
+                     onmouseenter="this.parentElement.querySelectorAll('.med-sugg-item').forEach(i => {i.classList.remove('active-sugg'); i.style.background=''}); this.classList.add('active-sugg'); this.style.background='var(--bg-hover)';"
+                     onmouseleave="this.classList.remove('active-sugg'); this.style.background=''"
+                     onclick="selectMedicine(this, '${unmappedPlaceholder.name.replace(/'/g, "\\'")}', ${unmappedPlaceholder.selling_price || 0}, ${unmappedPlaceholder.id}, ${unmappedPlaceholder.tablets_per_strip || 0}, 1)">
+                    <div style="font-weight:700; color:var(--text-primary); margin-bottom:2px; font-size:1em; letter-spacing:0.02em;">
+                        ${unmappedPlaceholder.name}
+                    </div>
+                    <div style="font-size:0.8em; color:#6366f1; font-style:italic; margin-bottom:4px; font-weight:600;">Generic Medicine</div>
+                    <div style="font-size:0.85em; font-weight:500; color:var(--text-secondary); margin-top:2px;">Brands: ${unmappedPlaceholder.brand_count !== undefined ? unmappedPlaceholder.brand_count : 0}</div>
+                </div>`;
+                idx++;
+            }
+            if (withoutBrandItem) { html += renderSuggItem(withoutBrandItem, idx === 0, false, true); idx++; }
+            brandItems.forEach(b => { html += renderSuggItem(b, idx === 0, false, false); idx++; });
+            if (unmappedPlaceholder) { html += renderSuggItem(unmappedPlaceholder, false, true, false); }
+        }
+        return html;
+    }
+
+    window.searchMedicine = async function (inputEl) {
+        const q = inputEl.value.trim().toLowerCase();
+        const row = inputEl.closest('.medicine-row');
+        const suggBox = row.querySelector('.med-suggestions');
+
+        if (q.length < 1) {
+            suggBox.style.display = 'none';
+            return;
+        }
+
+        // If cache not loaded yet, fall back to API call once to populate cache
+        if (!pharmacyCacheLoaded) {
+            try {
+                await loadPharmacyMedCache();
+            } catch (e) { console.error(e); }
+        }
+
+        // Filter client-side instantly — no network call needed
+        const filtered = pharmacyMedCache.filter(item => {
+            const name = (item.name || '').toLowerCase();
+            const generic = (item.generic_name || '').toLowerCase();
+            return name.includes(q) || generic.includes(q);
+        });
+
+        // Also update price cache
+        filtered.forEach(item => {
+            medDataCache[(item.name || '').toLowerCase()] = {
+                price: item.selling_price,
+                tps: item.tablets_per_strip || 0
+            };
+        });
+
+        const html = buildSuggestionHTML(filtered);
+        if (html) {
+            suggBox.innerHTML = html;
+            suggBox.style.display = 'block';
+        } else {
+            suggBox.style.display = 'none';
+        }
     };
+
 
     window.selectMedicine = function (el, name, price, batchId, tps, isUnmapped) {
         const row = el.closest('.medicine-row');
@@ -2072,6 +2077,9 @@ window.onunhandledrejection = function(event) {
 
         // Ensure UPI accounts are loaded before showing form
         await window.loadGlobalUpiAccounts();
+
+        // Pre-load medicine cache in background so first keystroke is instant
+        if (!pharmacyCacheLoaded) loadPharmacyMedCache();
 
         $('#medModalPatient').textContent = 'Direct Medicine Sale';
         $('#medModalDiag').textContent = '-';
