@@ -187,7 +187,7 @@
                             </div>
                             <div class="form-group">
                                 <label for="patDoctor">Assign Doctor *</label>
-                                <select id="patDoctor" required onchange="generateTokenGrid()">
+                                <select id="patDoctor" required onchange="if(window.updateTokenGrid) window.updateTokenGrid();">
                                     <option value="">Select Doctor</option>
                                     <!-- Dynamic options injected by JS -->
                                 </select>
@@ -249,6 +249,13 @@
         window.addEventListener('load', () => {
             window.scrollTo(0, 0);
         });
+        window.onerror = function(msg, src, line, col, err) {
+            console.error('JS Error:', msg, 'at', src, line);
+            return true;
+        };
+        window.onunhandledrejection = function(event) {
+            console.error('Unhandled Promise Rejection:', event.reason);
+        };
     </script>
     <script src="{{ url_for('static', filename='js/script_app_v2.js') }}?v=202607093"></script>
 </body>

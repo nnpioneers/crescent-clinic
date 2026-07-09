@@ -11,18 +11,12 @@ if (!String.prototype.toFixed) {
 
 // Global Error Handling for Frontend Stability
 window.onerror = function(message, source, lineno, colno, error) {
-    console.error("Caught Global Error:", message, "at", source, lineno + ":" + colno);
-    if (typeof window.toast === 'function') {
-        window.toast("A background error occurred, but the system is still running.", "error");
-    }
+    console.error("Caught JS Error:", message, "at", source, lineno + ":" + colno);
     return true; // Prevents the default browser error handling (keeps UI running)
 };
 
 window.onunhandledrejection = function(event) {
     console.error("Unhandled Promise Rejection:", event.reason);
-    if (typeof window.toast === 'function') {
-        window.toast("A background process failed, but the system is still running.", "error");
-    }
     event.preventDefault(); // Prevent crash
 };
 
