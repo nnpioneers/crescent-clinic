@@ -4044,7 +4044,7 @@ if ($uri === '/api/agency/ocr_scan' && $method === 'POST') {
         json_response(['success' => false, 'error' => 'No image uploaded. Please upload a valid bill photo.'], 400);
     }
     
-    $api_key = getenv('GEMINI_API_KEY') ?: ($_ENV['GEMINI_API_KEY'] ?? ''); 
+    $api_key = getenv('GEMINI_API_KEY') ?: ($_ENV['GEMINI_API_KEY'] ?? 'AQ.Ab8RN6L39pzc4R9d06t9OfuVbC0DyM-wAPnhw64rhJ8hieKYQw'); 
     if (empty($api_key) || $api_key === 'YOUR_GEMINI_API_KEY_HERE') {
         json_response(['success' => false, 'error' => 'Gemini API Key is not configured.'], 400);
     }
