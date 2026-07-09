@@ -691,8 +691,9 @@ window.onunhandledrejection = function(event) {
             }
 
 
-            // Disable most inputs if already approved, but fee stays editable via Edit Fee button
-            $('#feeInput').disabled = true; // Always read-only in this modal; use Edit Fee button
+            // Disable most inputs if already approved, but fee stays editable if waiting or prescribed
+            const isPrescribed = p.status === 'prescribed';
+            $('#feeInput').disabled = !(isWaiting || isPrescribed);
             $('#scanFeeInput').disabled = !isWaiting;
             if ($('#prescriptionInput')) $('#prescriptionInput').disabled = !isWaiting;
             if ($('#uptCardInput')) $('#uptCardInput').disabled = !isWaiting;
@@ -716,8 +717,11 @@ window.onunhandledrejection = function(event) {
 
             // Toggle buttons and message
             const btn = $('#btnPrescribe');
+            const btnUpdate = $('#btnUpdateFee');
             const msg = $('#alreadyApprovedMsg');
+            
             if (btn) btn.style.display = isWaiting ? 'flex' : 'none';
+            if (btnUpdate) btnUpdate.style.display = isPrescribed ? 'flex' : 'none';
             if (msg) {
                 msg.style.display = isWaiting ? 'none' : 'flex';
                 if (!isWaiting) {
@@ -801,6 +805,32 @@ window.onunhandledrejection = function(event) {
             }
         } catch (err) {
             toast('Failed to save prescription', 'error');
+        }
+    };
+
+    window.submitUpdatedDoctorFeeFromModal = async function () {
+        if (!currentPrescribePatientId) return;
+        const newFee = parseFloat($('#feeInput').value) || 0;
+        const btn = $('#btnUpdateFee');
+        if (btn) btn.disabled = true;
+
+        try {
+            const res = await api('/api/update_doctor_fee', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ patient_id: currentPrescribePatientId, consultation_fee: newFee })
+            });
+            if (res.success) {
+                toast('Doctor fee updated to ₹' + newFee.toFixed(2) + '!', 'success');
+                closeModal('prescribeModal');
+                loadPatients();
+            } else {
+                toast(res.error || 'Failed to update fee', 'error');
+            }
+        } catch(e) {
+            toast('Error saving fee', 'error');
+        } finally {
+            if (btn) btn.disabled = false;
         }
     };
 
