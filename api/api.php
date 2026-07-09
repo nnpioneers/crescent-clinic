@@ -1445,6 +1445,41 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
         $stmt_brands = $conn->prepare($brand_query);
         $stmt_brands->execute(["%$q%"]);
         $brand_batches = $stmt_brands->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Merge direct inventory matches (from $results) so searching by Brand Name works
+        $seen_ids = [];
+        foreach ($brand_batches as $bb) {
+            $seen_ids[$bb['id']] = true;
+        }
+        foreach ($results as $res) {
+            if (!isset($seen_ids[$res['id']])) {
+                $brand_batches[] = $res;
+                $seen_ids[$res['id']] = true;
+                // Since this item matched directly by brand name but its generic might not be in $gm_generics,
+                // we should add its generic name to the list of generic headers so it groups properly!
+                if (!empty($res['generic_name'])) {
+                    $gn = $res['generic_name'];
+                    $gn_lower = strtolower($gn);
+                    if (!in_array($gn_lower, $existing_lower, true)) {
+                        $gm_generics[] = $gn;
+                        $existing_lower[] = $gn_lower;
+                        // Also add the header to final_results!
+                        $stmt_count->execute([$gn]);
+                        $brand_count = (int)$stmt_count->fetchColumn();
+                        $final_results[] = [
+                            'id' => -1 * abs(crc32($gn)),
+                            'name' => $gn,
+                            'generic_name' => $gn,
+                            'is_unmapped' => 1,
+                            'is_generic_header' => 1,
+                            'brand_count' => $brand_count,
+                            'selling_price' => 0,
+                            'tablets_per_strip' => 0
+                        ];
+                    }
+                }
+            }
+        }
 
         // Track which generics already have a "Without Brand" result from inventory
         $generics_with_without_brand = [];

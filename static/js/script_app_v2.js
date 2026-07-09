@@ -1311,7 +1311,7 @@ window.onunhandledrejection = function(event) {
         const row = inputEl.closest('.medicine-row');
         const suggBox = row.querySelector('.med-suggestions');
 
-        if (q.length < 2) {
+        if (q.length < 1) {
             suggBox.style.display = 'none';
             return;
         }
