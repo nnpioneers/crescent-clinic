@@ -18,3 +18,4 @@ A web-based hospital and clinic management system designed to streamline medical
 - **Database**: MySQL / MariaDB
 - **Frontend**: HTML, CSS, JavaScript (Vanilla design)
 - **Utilities**: Composer dependencies, Supabase Storage integration, FPDF
+- **Deployment**: Integrated with GitHub & Hostinger CI/CD
