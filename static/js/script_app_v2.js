@@ -1504,8 +1504,7 @@ window.onunhandledrejection = function(event) {
             wrapper.style.marginTop = '8px';
             wrapper.innerHTML = `<label style="font-size:0.85em; color:var(--text-secondary); margin-bottom:4px; display:block;">Brand Name (Optional)</label>
                                  <div style="display:flex; gap:6px;">
-                                     <input type="text" class="form-control med-new-brand" placeholder="Enter Brand Name" style="font-size:0.9em; border-color:#6366f1;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); saveNewBrandInline(this); }">
-                                     <button type="button" class="btn btn-primary btn-sm" onclick="saveNewBrandInline(this)" style="padding: 0 12px; font-weight:600;">Save</button>
+                                     <input type="text" class="form-control med-new-brand" placeholder="Enter Brand Name" style="font-size:0.9em; border-color:#6366f1;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); }">
                                  </div>`;
             row.querySelector('.med-name').parentNode.appendChild(wrapper);
         }
