@@ -1491,9 +1491,9 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
 
     // Load matching batches directly if search is empty or we want to populate the sub-results
     if ($q) {
-        $brand_query = "SELECT i.*, COALESCE(NULLIF(i.agency_name,''), s.name) as agency_name FROM inventory i LEFT JOIN agency_suppliers s ON i.supplier_id = s.id WHERE LOWER(i.generic_name) IN (SELECT DISTINCT LOWER(generic_name) FROM generic_mappings WHERE LOWER(generic_name) LIKE ?) LIMIT 300";
+        $brand_query = "SELECT i.*, COALESCE(NULLIF(i.agency_name,''), s.name) as agency_name FROM inventory i LEFT JOIN agency_suppliers s ON i.supplier_id = s.id WHERE LOWER(i.generic_name) IN (SELECT DISTINCT LOWER(generic_name) FROM generic_mappings WHERE LOWER(generic_name) LIKE ? OR LOWER(brand_name) LIKE ?) LIMIT 300";
         $stmt_brands = $conn->prepare($brand_query);
-        $stmt_brands->execute([strtolower("%$q%")]);
+        $stmt_brands->execute([strtolower("%$q%"), strtolower("%$q%")]);
         $brand_batches = $stmt_brands->fetchAll(PDO::FETCH_ASSOC);
         
         // Merge direct inventory matches (from $results) so searching by Brand Name works

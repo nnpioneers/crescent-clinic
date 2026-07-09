@@ -1517,9 +1517,9 @@ window.onunhandledrejection = function(event) {
                 let html = '', idx = 0;
                 for (const g in groups) {
                     const grp = groups[g];
-                    const unm = grp.find(i => i.is_unmapped == 1);
+                    const unm = grp.find(i => i.is_generic_header == 1);
                     const wb  = grp.find(i => i.is_actual_without_brand == 1);
-                    const brs = grp.filter(i => i.is_actual_without_brand != 1 && i.is_unmapped != 1);
+                    const brs = grp.filter(i => i.is_actual_without_brand != 1 && i.is_generic_header != 1);
 
                     if (unm) {
                         html += `<div class="med-sugg-item ${idx===0?'active-sugg':''}" style="padding:10px 12px; cursor:pointer; border-bottom:1px solid var(--border); ${idx===0?'background:var(--bg-hover);':''}"
