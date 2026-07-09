@@ -938,6 +938,7 @@ window.onunhandledrejection = function(event) {
             }
             if (id === 'Inventory') {
                 if (typeof window.loadInventory === 'function') window.loadInventory();
+                if (typeof window.loadGenericMedicines === 'function') window.loadGenericMedicines();
             }
             if (id === 'Agency') {
                 if (typeof window.loadAgencyStock === 'function') window.loadAgencyStock();
