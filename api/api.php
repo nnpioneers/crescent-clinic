@@ -1382,9 +1382,9 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     // }
     
     if ($category === 'medicine') {
-        $conditions[] = "(i.category IS NULL OR i.category NOT IN ('Injection', 'INJ', 'IV'))";
+        $conditions[] = "((i.category IS NULL OR i.category NOT IN ('Injection', 'INJ', 'IV')) AND LOWER(i.name) NOT LIKE '%(inj)%' AND LOWER(i.generic_name) NOT LIKE '%(inj)%')";
     } elseif ($category === 'Injection' || $category === 'INJ') {
-        $conditions[] = "i.category IN ('Injection', 'INJ')";
+        $conditions[] = "(i.category IN ('Injection', 'INJ') OR LOWER(i.name) LIKE '%(inj)%' OR LOWER(i.generic_name) LIKE '%(inj)%')";
     } elseif ($category) {
         $conditions[] = "i.category = ?";
         $params[] = $category;
@@ -1412,9 +1412,9 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
         $gm_params[] = strtolower("$q%");
     }
     if ($category === 'medicine') {
-        $gm_conditions[] = "(category IS NULL OR category NOT IN ('Injection', 'INJ', 'IV'))";
+        $gm_conditions[] = "((category IS NULL OR category NOT IN ('Injection', 'INJ', 'IV')) AND LOWER(generic_name) NOT LIKE '%(inj)%')";
     } elseif ($category === 'Injection' || $category === 'INJ') {
-        $gm_conditions[] = "category IN ('Injection', 'INJ')";
+        $gm_conditions[] = "(category IN ('Injection', 'INJ') OR LOWER(generic_name) LIKE '%(inj)%')";
     } elseif ($category) {
         $gm_conditions[] = "category = ?";
         $gm_params[] = $category;
@@ -1443,9 +1443,9 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
         $ai_conditions = ["LOWER(item_name) = '(unmapped brand)'", "generic_name IS NOT NULL", "TRIM(generic_name) != ''", "LOWER(generic_name) LIKE ?"];
         $ai_params     = [strtolower("$q%")];
         if ($category === 'medicine') {
-            $ai_conditions[] = "(category IS NULL OR category NOT IN ('Injection', 'INJ', 'IV'))";
+            $ai_conditions[] = "((category IS NULL OR category NOT IN ('Injection', 'INJ', 'IV')) AND LOWER(generic_name) NOT LIKE '%(inj)%')";
         } elseif ($category === 'Injection' || $category === 'INJ') {
-            $ai_conditions[] = "category IN ('Injection', 'INJ')";
+            $ai_conditions[] = "(category IN ('Injection', 'INJ') OR LOWER(generic_name) LIKE '%(inj)%')";
         } elseif ($category) {
             $ai_conditions[] = "category = ?";
             $ai_params[] = $category;
