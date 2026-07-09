@@ -648,8 +648,12 @@ if ($uri === '/api/update_doctor_fee' && $method === 'POST') {
 
     $conn = get_db();
     // Update prescription consultation fee
-    $stmt = $conn->prepare("UPDATE prescriptions SET consultation_fee = ? WHERE patient_id = ?");
-    $stmt->execute([$new_fee, $patient_id]);
+    $stmt = $conn->prepare("UPDATE prescriptions SET 
+        total_amount = total_amount - consultation_fee + ?, 
+        balance_amount = balance_amount - consultation_fee + ?, 
+        consultation_fee = ? 
+        WHERE patient_id = ?");
+    $stmt->execute([$new_fee, $new_fee, $new_fee, $patient_id]);
 
     if ($stmt->rowCount() === 0) {
         // No prescription row yet — that's fine, just acknowledge
@@ -1405,7 +1409,8 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     $gm_conditions = [];
     $gm_params = [];
     if ($q) {
-        $gm_conditions[] = "LOWER(generic_name) LIKE ?";
+        $gm_conditions[] = "(LOWER(generic_name) LIKE ? OR LOWER(brand_name) LIKE ?)";
+        $gm_params[] = strtolower("%$q%");
         $gm_params[] = strtolower("%$q%");
     }
     if ($category === 'medicine') {
@@ -1423,7 +1428,8 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     }
     // Prioritize prefix matches
     if ($q) {
-        $gm_query .= " ORDER BY CASE WHEN LOWER(generic_name) LIKE ? THEN 0 ELSE 1 END, generic_name ASC LIMIT 30";
+        $gm_query .= " ORDER BY CASE WHEN LOWER(generic_name) LIKE ? OR LOWER(brand_name) LIKE ? THEN 0 ELSE 1 END, generic_name ASC LIMIT 30";
+        $gm_params[] = strtolower("$q%");
         $gm_params[] = strtolower("$q%");
     } else {
         $gm_query .= " ORDER BY generic_name ASC LIMIT 30";

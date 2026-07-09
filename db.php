@@ -149,6 +149,7 @@ function get_db()
             $gm_col_migrations = [
                 'expiry_date' => "ALTER TABLE generic_mappings ADD COLUMN expiry_date VARCHAR(100) DEFAULT NULL",
                 'min_stock' => "ALTER TABLE generic_mappings ADD COLUMN min_stock INT DEFAULT 0",
+                'category' => "ALTER TABLE generic_mappings ADD COLUMN category VARCHAR(100) DEFAULT NULL",
             ];
 
             foreach ($gm_col_migrations as $col_name => $sql) {
