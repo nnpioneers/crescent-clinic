@@ -628,6 +628,38 @@ if (preg_match('/^\/api\/patient\/(\d+)$/', $uri, $matches)) {
 }
 
 // ═══════════════════════════════════════════
+// API — UPDATE DOCTOR FEE (after prescription)
+// ═══════════════════════════════════════════
+
+if ($uri === '/api/update_doctor_fee' && $method === 'POST') {
+    enforce_api_auth(['doctor']);
+    $input = json_decode(file_get_contents('php://input'), true);
+    $patient_id   = (int)($input['patient_id'] ?? 0);
+    $new_fee      = (float)($input['consultation_fee'] ?? 0);
+
+    if (!$patient_id) {
+        json_response(['error' => 'Invalid patient ID'], 400);
+        exit;
+    }
+    if ($new_fee < 0) {
+        json_response(['error' => 'Fee cannot be negative'], 400);
+        exit;
+    }
+
+    $conn = get_db();
+    // Update prescription consultation fee
+    $stmt = $conn->prepare("UPDATE prescriptions SET consultation_fee = ? WHERE patient_id = ?");
+    $stmt->execute([$new_fee, $patient_id]);
+
+    if ($stmt->rowCount() === 0) {
+        // No prescription row yet — that's fine, just acknowledge
+        json_response(['success' => true, 'message' => 'No prescription record found to update']);
+    } else {
+        json_response(['success' => true, 'new_fee' => $new_fee]);
+    }
+}
+
+// ═══════════════════════════════════════════
 // API — DOCTOR PRESCRIBE
 // ═══════════════════════════════════════════
 

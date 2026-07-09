@@ -613,6 +613,11 @@ window.onunhandledrejection = function(event) {
             const statusClass = p.status === 'waiting' ? 'badge-waiting'
                 : p.status === 'prescribed' ? 'badge-consulted' : 'badge-completed';
             const displayStatus = p.status === 'prescribed' ? 'Consulted' : p.status;
+            // Show Edit Fee button for prescribed (moved to pharmacy) patients
+            const editFeeBtn = p.status === 'prescribed'
+                ? `<button class="btn btn-outline btn-sm" style="margin-top:8px; font-size:0.78rem; color:var(--accent); border-color:var(--accent);"
+                       onclick="event.stopPropagation(); editDoctorFee(${p.id}, '${p.name.replace(/'/g,"\\'")}')">✏️ Edit Fee</button>`
+                : '';
             return `
             <div class="patient-card" onclick="openPrescribe(${p.id})">
                 <div class="pc-info">
@@ -624,8 +629,9 @@ window.onunhandledrejection = function(event) {
                         <div class="pc-meta">${p.complaint || 'No complaint noted'}</div>
                     </div>
                 </div>
-                <div>
+                <div style="display:flex; flex-direction:column; align-items:flex-end;">
                     <span class="badge ${statusClass}" style="text-transform: capitalize;">${displayStatus}</span>
+                    ${editFeeBtn}
                 </div>
             </div>
         `;
@@ -691,8 +697,8 @@ window.onunhandledrejection = function(event) {
             }
 
 
-            // Disable inputs if already approved
-            $('#feeInput').disabled = !isWaiting;
+            // Disable most inputs if already approved, but fee stays editable via Edit Fee button
+            $('#feeInput').disabled = true; // Always read-only in this modal; use Edit Fee button
             $('#scanFeeInput').disabled = !isWaiting;
             if ($('#prescriptionInput')) $('#prescriptionInput').disabled = !isWaiting;
             if ($('#uptCardInput')) $('#uptCardInput').disabled = !isWaiting;
@@ -801,6 +807,78 @@ window.onunhandledrejection = function(event) {
             }
         } catch (err) {
             toast('Failed to save prescription', 'error');
+        }
+    };
+
+    // ─── Edit Doctor Fee (after patient moved to Pharmacy) ───────────────────────
+    window.editDoctorFee = async function (patientId, patientName) {
+        let currentFee = 0;
+        try {
+            const p = await api('/api/patient/' + patientId);
+            currentFee = p.consultation_fee || 0;
+        } catch(e) { /* use 0 */ }
+
+        const existing = document.getElementById('editFeeModal');
+        if (existing) existing.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'editFeeModal';
+        overlay.className = 'modal-overlay';
+        overlay.style.display = 'flex';
+        overlay.innerHTML = `
+            <div class="modal" style="max-width:380px;">
+                <div class="modal-header">
+                    <h3>✏️ Edit Doctor Fee — ${patientName}</h3>
+                    <button class="modal-close" onclick="document.getElementById('editFeeModal').remove()">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="editFeeInput" style="font-size:0.9rem; font-weight:600;">Consultation Fee (₹)</label>
+                        <input type="number" id="editFeeInput" value="${currentFee}" min="0" step="0.01"
+                            style="font-size:1.4rem; font-weight:700; text-align:center; padding:12px;"
+                            onfocus="if(this.value==='0') this.value='';"
+                            onblur="if(this.value==='') this.value='0';"
+                            onkeydown="if(event.key==='Enter') document.getElementById('editFeeSaveBtn').click();">
+                    </div>
+                    <p style="font-size:0.82rem; color:var(--text-secondary); margin-top:8px; margin-bottom:0;">
+                        This updates the consultation fee for this patient's prescription immediately.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline" onclick="document.getElementById('editFeeModal').remove()">Cancel</button>
+                    <button class="btn btn-success" id="editFeeSaveBtn" onclick="saveEditedDoctorFee(${patientId})">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                        Save Fee
+                    </button>
+                </div>
+            </div>`;
+        document.body.appendChild(overlay);
+        setTimeout(() => { const inp = document.getElementById('editFeeInput'); if (inp) { inp.focus(); inp.select(); } }, 80);
+    };
+
+    window.saveEditedDoctorFee = async function (patientId) {
+        const inp = document.getElementById('editFeeInput');
+        if (!inp) return;
+        const newFee = parseFloat(inp.value) || 0;
+        const btn = document.getElementById('editFeeSaveBtn');
+        if (btn) btn.disabled = true;
+        try {
+            const res = await api('/api/update_doctor_fee', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ patient_id: patientId, consultation_fee: newFee })
+            });
+            if (res.success) {
+                toast('Doctor fee updated to ₹' + newFee.toFixed(2) + '!', 'success');
+                document.getElementById('editFeeModal').remove();
+                loadPatients();
+            } else {
+                toast(res.error || 'Failed to update fee', 'error');
+                if (btn) btn.disabled = false;
+            }
+        } catch(e) {
+            toast('Error saving fee', 'error');
+            if (btn) btn.disabled = false;
         }
     };
 
