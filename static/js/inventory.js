@@ -1,10 +1,13 @@
+        let invSearchTimeout = null;
         async function loadInventory() {
-            const q = document.getElementById('invSearch').value;
-            const inc = document.getElementById('invShowEmpty').checked ? '1' : '0';
-            try {
-                const res = await api(`/api/inventory/search?q=${encodeURIComponent(q)}&all=${inc}`);
-                const tbody = document.getElementById('inventoryBody');
-                tbody.innerHTML = res.map(i => {
+            clearTimeout(invSearchTimeout);
+            invSearchTimeout = setTimeout(async () => {
+                const q = document.getElementById('invSearch').value;
+                const inc = document.getElementById('invShowEmpty').checked ? '1' : '0';
+                try {
+                    const res = await api(`/api/inventory/search?q=${encodeURIComponent(q)}&all=${inc}`);
+                    const tbody = document.getElementById('inventoryBody');
+                    tbody.innerHTML = res.map(i => {
                     let stockVal = i.stock;
                     let displayStock = stockVal;
                     const catLower = (i.category || '').toLowerCase();

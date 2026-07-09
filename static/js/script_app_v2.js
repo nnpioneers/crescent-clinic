@@ -1306,15 +1306,18 @@ window.onunhandledrejection = function(event) {
         setTimeout(() => { row.querySelector('.inj-name').focus(); }, 10);
     };
 
+    let searchMedicineTimeout = null;
     window.searchMedicine = async function (inputEl) {
-        const q = inputEl.value.trim();
-        const row = inputEl.closest('.medicine-row');
-        const suggBox = row.querySelector('.med-suggestions');
+        clearTimeout(searchMedicineTimeout);
+        searchMedicineTimeout = setTimeout(async () => {
+            const q = inputEl.value.trim();
+            const row = inputEl.closest('.medicine-row');
+            const suggBox = row.querySelector('.med-suggestions');
 
-        if (q.length < 1) {
-            suggBox.style.display = 'none';
-            return;
-        }
+            if (q.length < 1) {
+                suggBox.style.display = 'none';
+                return;
+            }
 
         try {
             const isPharmacy = inputEl.id.startsWith('pharmacy') || inputEl.closest('#medicineRows');
@@ -1485,6 +1488,7 @@ window.onunhandledrejection = function(event) {
         } catch (e) {
             console.error(e);
         }
+        }, 300); // 300ms debounce
     };
 
     window.selectMedicine = function (el, name, price, batchId, tps, isUnmapped) {
