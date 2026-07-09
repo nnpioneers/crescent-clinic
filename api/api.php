@@ -138,6 +138,18 @@ function get_mapped_generic_name($conn, $brand_name) {
 }
 
 // Bidirectional synchronization between agency_items and inventory tables
+function ensure_synthesized_inventory($conn, $name) {
+    if (!$name || strpos($name, ' (Without Brand)') === false) return;
+    $stmt = $conn->prepare("SELECT id FROM inventory WHERE name=?");
+    $stmt->execute([$name]);
+    if (!$stmt->fetch()) {
+        $gen_name = trim(str_replace(' (Without Brand)', '', $name));
+        $ph_batch = 'ph_' . substr(md5(uniqid()), 0, 8);
+        $stmt2 = $conn->prepare("INSERT IGNORE INTO inventory (name, generic_name, brand_name, stock, batch_number, category) VALUES (?, ?, '(Unmapped Brand)', 0, ?, 'Tablet')");
+        $stmt2->execute([$name, $gen_name, $ph_batch]);
+    }
+}
+
 function sync_stock_item($conn, $item_name, $batch_number, $source) {
     $batch_number = $batch_number ?? '';
     if (empty($item_name)) {
@@ -847,6 +859,7 @@ if (($uri === '/api/add_medicines' || $uri === '/api/direct_pharmacy') && $metho
                         sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
                     }
                 } else {
+                    ensure_synthesized_inventory($conn, $name);
                     $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, tablets_per_strip, id FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
                     $stmt->execute([$name]);
                     $row = $stmt->fetch();
@@ -866,6 +879,7 @@ if (($uri === '/api/add_medicines' || $uri === '/api/direct_pharmacy') && $metho
 
         $deduct_stock_by_name = function($item_name) use ($conn, &$total_cost) {
             if (!$item_name || trim($item_name) === '') return;
+            ensure_synthesized_inventory($conn, $item_name);
             $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, id FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
             $stmt->execute([trim($item_name)]);
             $row = $stmt->fetch();
@@ -988,7 +1002,7 @@ if ($uri === '/api/direct_sales/add' && $method === 'POST') {
             $m['net_qty'] = $qty;
 
             if ($name && $qty > 0) {
-                if ($batch_id) {
+                if ($batch_id && (int)$batch_id > 0) {
                     $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, tablets_per_strip FROM inventory WHERE id=?");
                     $stmt->execute([$batch_id]);
                     $row = $stmt->fetch();
@@ -999,6 +1013,7 @@ if ($uri === '/api/direct_sales/add' && $method === 'POST') {
                         sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
                     }
                 } else {
+                    ensure_synthesized_inventory($conn, $name);
                     $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, tablets_per_strip, id FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
                     $stmt->execute([$name]);
                     $row = $stmt->fetch();
@@ -1020,6 +1035,7 @@ if ($uri === '/api/direct_sales/add' && $method === 'POST') {
 
         $deduct_single = function($item_name) use ($conn, &$total_cost) {
             if (!$item_name || trim($item_name) === '') return;
+            ensure_synthesized_inventory($conn, $item_name);
             $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, id FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
             $stmt->execute([trim($item_name)]);
             $row = $stmt->fetch();
