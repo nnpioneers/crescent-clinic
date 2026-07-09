@@ -2589,3 +2589,27 @@ window.gmSaveNewItem = async function() {
         toast(e.message || 'Failed to add item.', 'error');
     }
 };
+
+// Expose functions for global live synchronization
+window.loadGenericMedicines = loadGenericMedicines;
+
+window.loadAgencyStock = function() {
+    const activeBtn = document.querySelector('#agencyTabs .btn.active');
+    if (activeBtn && activeBtn.getAttribute('onclick')) {
+        const match = activeBtn.getAttribute('onclick').match(/switchAgencyTab\('([^']+)'/);
+        if (match) {
+            const tabName = match[1];
+            if (tabName === 'dashboard') loadAgencyDashboard();
+            if (tabName === 'categories') loadAgencyCategories();
+            if (tabName === 'suppliers') loadAgencySuppliers();
+            if (tabName === 'items') loadAgencyItems();
+            if (tabName === 'purchases') { loadAgencySuppliersForSelect(); loadAgencyPurchases(); }
+            if (tabName === 'stock') loadAgencyItemsForSelect();
+            if (tabName === 'reports') loadAgencyReports();
+            if (tabName === 'agencies-view') loadAgencyAgenciesView();
+        }
+    } else {
+        loadAgencyDashboard();
+    }
+};
+

@@ -159,6 +159,9 @@ window.onunhandledrejection = function(event) {
         if (typeof window.loadInventory === 'function') {
             window.loadInventory();
         }
+        if (typeof window.loadGenericMedicines === 'function') {
+            window.loadGenericMedicines();
+        }
         if (typeof window.loadPatientsList === 'function') {
             window.loadPatientsList();
         }
