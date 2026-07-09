@@ -1372,11 +1372,9 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     $conditions = [];
     
     if ($q) {
-        $conditions[] = "(LOWER(i.name) LIKE ? OR LOWER(i.generic_name) LIKE ? OR LOWER(i.item_code) LIKE ? OR LOWER(i.batch_number) LIKE ?)";
-        $params[] = strtolower("%$q%");
-        $params[] = strtolower("%$q%");
-        $params[] = strtolower("%$q%");
-        $params[] = strtolower("%$q%");
+        $conditions[] = "(LOWER(i.name) LIKE ? OR LOWER(i.generic_name) LIKE ?)";
+        $params[] = strtolower("$q%");
+        $params[] = strtolower("$q%");
     }
     // User request: Do NOT filter by stock, price, etc. in search dropdown
     // if (!$include_all) {
@@ -1410,8 +1408,8 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     $gm_params = [];
     if ($q) {
         $gm_conditions[] = "(LOWER(generic_name) LIKE ? OR LOWER(brand_name) LIKE ?)";
-        $gm_params[] = strtolower("%$q%");
-        $gm_params[] = strtolower("%$q%");
+        $gm_params[] = strtolower("$q%");
+        $gm_params[] = strtolower("$q%");
     }
     if ($category === 'medicine') {
         $gm_conditions[] = "(category IS NULL OR category NOT IN ('Injection', 'INJ', 'IV'))";
@@ -1443,7 +1441,7 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     // yet been synced into generic_mappings (e.g. just created via /api/generics/add).
     if ($q) {
         $ai_conditions = ["LOWER(item_name) = '(unmapped brand)'", "generic_name IS NOT NULL", "TRIM(generic_name) != ''", "LOWER(generic_name) LIKE ?"];
-        $ai_params     = [strtolower("%$q%")];
+        $ai_params     = [strtolower("$q%")];
         if ($category === 'medicine') {
             $ai_conditions[] = "(category IS NULL OR category NOT IN ('Injection', 'INJ', 'IV'))";
         } elseif ($category === 'Injection' || $category === 'INJ') {
@@ -1493,7 +1491,7 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     if ($q) {
         $brand_query = "SELECT i.*, COALESCE(NULLIF(i.agency_name,''), s.name) as agency_name FROM inventory i LEFT JOIN agency_suppliers s ON i.supplier_id = s.id WHERE LOWER(i.generic_name) IN (SELECT DISTINCT LOWER(generic_name) FROM generic_mappings WHERE LOWER(generic_name) LIKE ? OR LOWER(brand_name) LIKE ?) ORDER BY CASE WHEN LOWER(i.name) LIKE ? THEN 0 ELSE 1 END, i.name ASC LIMIT 300";
         $stmt_brands = $conn->prepare($brand_query);
-        $stmt_brands->execute([strtolower("%$q%"), strtolower("%$q%"), strtolower("$q%")]);
+        $stmt_brands->execute([strtolower("$q%"), strtolower("$q%"), strtolower("$q%")]);
         $brand_batches = $stmt_brands->fetchAll(PDO::FETCH_ASSOC);
         
         // Merge direct inventory matches (from $results) so searching by Brand Name works

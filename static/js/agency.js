@@ -2127,13 +2127,15 @@ window.gmSaveGenericName = async function() {
     }
     
     const catSelect = document.getElementById('gmEditGenericCategory');
+    let categoryValue = "";
     if (catSelect && catSelect.value) {
-        newName = `${newName} (${catSelect.value})`;
+        categoryValue = catSelect.value;
+        newName = `${newName} (${categoryValue})`;
     }
     try {
         const res = await api('/api/generics/rename-generic', {
             method: 'POST',
-            body: { old_name: oldName, new_name: newName }
+            body: { old_name: oldName, new_name: newName, category: categoryValue }
         });
         if (res.success) {
             toast('Generic medicine renamed successfully!', 'success');
@@ -2596,10 +2598,12 @@ window.gmSaveNewItem = async function() {
         toast('Please enter an item name.', 'error');
         return;
     }
+    const catEl = document.getElementById('gmAddCategory');
+    const category = (catEl ? catEl.value : 'TAB').trim();
     try {
         const res = await api('/api/generics/add', {
             method: 'POST',
-            body: { generic_name: name }
+            body: { generic_name: name, category: category }
         });
         if (res.success) {
             toast(res.message || 'Item added successfully!', 'success');
