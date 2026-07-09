@@ -319,6 +319,26 @@
                                 <label style="font-size:0.8rem; text-transform:uppercase; letter-spacing:.06em; color:var(--text-secondary); font-weight:600;">Item Name</label>
                                 <input type="text" id="gmEditGenericNewName" class="form-control" required style="width: 100%; box-sizing: border-box; margin-top: 8px;">
                             </div>
+                            <div class="form-group" style="margin-top: 15px;">
+                                <label style="font-size:0.8rem; text-transform:uppercase; letter-spacing:.06em; color:var(--text-secondary); font-weight:600;">Category</label>
+                                <select id="gmEditGenericCategory" class="form-control" style="width: 100%; box-sizing: border-box; margin-top: 8px;">
+                                    <option value="">-- No Category --</option>
+                                    <option value="TAB">TAB</option>
+                                    <option value="CAP">CAP</option>
+                                    <option value="SYP">SYP</option>
+                                    <option value="INJ">INJ</option>
+                                    <option value="CRM">CRM</option>
+                                    <option value="GEL">GEL</option>
+                                    <option value="DROP">DROP</option>
+                                    <option value="POW">POW</option>
+                                    <option value="LOT">LOT</option>
+                                    <option value="SPRAY">SPRAY</option>
+                                    <option value="OINT">OINT</option>
+                                    <option value="Surgical">Surgical</option>
+                                    <option value="Other">Other</option>
+                                    <option value="Tablet">Tablet</option>
+                                </select>
+                            </div>
                             <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
                                 <button type="button" class="btn btn-outline" onclick="closeModal('gmEditGenericModal')">Cancel</button>
                                 <button type="button" class="btn btn-primary" onclick="gmSaveGenericName()">Save Changes</button>

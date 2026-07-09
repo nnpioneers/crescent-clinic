@@ -2096,16 +2096,39 @@ window.gmOpenEditModal = function(encodedBrand) {
 
 window.gmEditGenericName = function(genericName) {
     document.getElementById('gmEditGenericOldName').value = genericName;
-    document.getElementById('gmEditGenericNewName').value = genericName;
+    
+    let baseName = genericName;
+    let category = "";
+    const catSelect = document.getElementById('gmEditGenericCategory');
+    
+    if (catSelect) {
+        for (let i = 1; i < catSelect.options.length; i++) {
+            const cat = catSelect.options[i].value;
+            const suffix = ` (${cat})`;
+            if (genericName.endsWith(suffix)) {
+                baseName = genericName.substring(0, genericName.length - suffix.length).trim();
+                category = cat;
+                break;
+            }
+        }
+        catSelect.value = category;
+    }
+    
+    document.getElementById('gmEditGenericNewName').value = baseName;
     openModal('gmEditGenericModal');
 };
 
 window.gmSaveGenericName = async function() {
     const oldName = document.getElementById('gmEditGenericOldName').value.trim();
-    const newName = document.getElementById('gmEditGenericNewName').value.trim();
+    let newName = document.getElementById('gmEditGenericNewName').value.trim();
     if (!newName) {
         toast('Generic name cannot be empty', 'error');
         return;
+    }
+    
+    const catSelect = document.getElementById('gmEditGenericCategory');
+    if (catSelect && catSelect.value) {
+        newName = `${newName} (${catSelect.value})`;
     }
     try {
         const res = await api('/api/generics/rename-generic', {
