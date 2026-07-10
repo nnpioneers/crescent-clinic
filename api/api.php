@@ -1372,9 +1372,11 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     $conditions = [];
     
     if ($q) {
-        $conditions[] = "(LOWER(i.name) LIKE ? OR LOWER(i.generic_name) LIKE ?)";
+        $conditions[] = "(LOWER(TRIM(REPLACE(i.name, 0xEFBBBF, ''))) LIKE ? OR LOWER(TRIM(REPLACE(i.name, 0xEFBBBF, ''))) LIKE ? OR LOWER(TRIM(REPLACE(i.generic_name, 0xEFBBBF, ''))) LIKE ? OR LOWER(TRIM(REPLACE(i.generic_name, 0xEFBBBF, ''))) LIKE ?)";
         $params[] = strtolower("$q%");
+        $params[] = strtolower("% $q%");
         $params[] = strtolower("$q%");
+        $params[] = strtolower("% $q%");
     }
     // User request: Do NOT filter by stock, price, etc. in search dropdown
     // if (!$include_all) {
@@ -1394,7 +1396,7 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
         $query .= " WHERE " . implode(" AND ", $conditions);
     }
     if ($q) {
-        $query .= " ORDER BY CASE WHEN LOWER(i.name) LIKE ? THEN 0 ELSE 1 END, i.name ASC LIMIT 100";
+        $query .= " ORDER BY CASE WHEN LOWER(TRIM(REPLACE(i.name, 0xEFBBBF, ''))) LIKE ? THEN 0 ELSE 1 END, i.name ASC LIMIT 100";
         $params[] = strtolower("$q%");
     } else {
         $query .= " ORDER BY i.name ASC LIMIT 100";
@@ -1407,9 +1409,11 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     $gm_conditions = [];
     $gm_params = [];
     if ($q) {
-        $gm_conditions[] = "(LOWER(generic_name) LIKE ? OR LOWER(brand_name) LIKE ?)";
+        $gm_conditions[] = "(LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) LIKE ? OR LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) LIKE ? OR LOWER(TRIM(REPLACE(brand_name, 0xEFBBBF, ''))) LIKE ? OR LOWER(TRIM(REPLACE(brand_name, 0xEFBBBF, ''))) LIKE ?)";
         $gm_params[] = strtolower("$q%");
+        $gm_params[] = strtolower("% $q%");
         $gm_params[] = strtolower("$q%");
+        $gm_params[] = strtolower("% $q%");
     }
     if ($category === 'medicine') {
         $gm_conditions[] = "((category IS NULL OR category NOT IN ('Injection', 'INJ', 'IV')) AND LOWER(generic_name) NOT LIKE '%(inj)%')";
@@ -1426,7 +1430,7 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     }
     // Prioritize prefix matches
     if ($q) {
-        $gm_query .= " ORDER BY CASE WHEN LOWER(generic_name) LIKE ? OR LOWER(brand_name) LIKE ? THEN 0 ELSE 1 END, generic_name ASC LIMIT 30";
+        $gm_query .= " ORDER BY CASE WHEN LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) LIKE ? OR LOWER(TRIM(REPLACE(brand_name, 0xEFBBBF, ''))) LIKE ? THEN 0 ELSE 1 END, generic_name ASC LIMIT 30";
         $gm_params[] = strtolower("$q%");
         $gm_params[] = strtolower("$q%");
     } else {
@@ -1440,17 +1444,17 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     // ── BUG FIX: Also pick up generics that exist in agency_items but have not
     // yet been synced into generic_mappings (e.g. just created via /api/generics/add).
     if ($q) {
-        $ai_conditions = ["LOWER(item_name) = '(unmapped brand)'", "generic_name IS NOT NULL", "TRIM(generic_name) != ''", "LOWER(generic_name) LIKE ?"];
-        $ai_params     = [strtolower("$q%")];
+        $ai_conditions = ["LOWER(TRIM(REPLACE(item_name, 0xEFBBBF, ''))) = '(unmapped brand)'", "generic_name IS NOT NULL", "TRIM(generic_name) != ''", "(LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) LIKE ? OR LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) LIKE ?)"];
+        $ai_params     = [strtolower("$q%"), strtolower("% $q%")];
         if ($category === 'medicine') {
-            $ai_conditions[] = "((category IS NULL OR category NOT IN ('Injection', 'INJ', 'IV')) AND LOWER(generic_name) NOT LIKE '%(inj)%')";
+            $ai_conditions[] = "((category IS NULL OR category NOT IN ('Injection', 'INJ', 'IV')) AND LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) NOT LIKE '%(inj)%')";
         } elseif ($category === 'Injection' || $category === 'INJ') {
-            $ai_conditions[] = "(category IN ('Injection', 'INJ') OR LOWER(generic_name) LIKE '%(inj)%')";
+            $ai_conditions[] = "(category IN ('Injection', 'INJ') OR LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) LIKE '%(inj)%')";
         } elseif ($category) {
             $ai_conditions[] = "category = ?";
             $ai_params[] = $category;
         }
-        $ai_query = "SELECT DISTINCT generic_name FROM agency_items WHERE " . implode(" AND ", $ai_conditions) . " ORDER BY CASE WHEN LOWER(generic_name) LIKE ? THEN 0 ELSE 1 END, generic_name ASC LIMIT 30";
+        $ai_query = "SELECT DISTINCT generic_name FROM agency_items WHERE " . implode(" AND ", $ai_conditions) . " ORDER BY CASE WHEN LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) LIKE ? THEN 0 ELSE 1 END, generic_name ASC LIMIT 30";
         $ai_params[] = strtolower("$q%");
         $stmt_ai = $conn->prepare($ai_query);
         $stmt_ai->execute($ai_params);
@@ -1489,9 +1493,9 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
 
     // Load matching batches directly if search is empty or we want to populate the sub-results
     if ($q) {
-        $brand_query = "SELECT i.*, COALESCE(NULLIF(i.agency_name,''), s.name) as agency_name FROM inventory i LEFT JOIN agency_suppliers s ON i.supplier_id = s.id WHERE LOWER(i.generic_name) IN (SELECT DISTINCT LOWER(generic_name) FROM generic_mappings WHERE LOWER(generic_name) LIKE ? OR LOWER(brand_name) LIKE ?) ORDER BY CASE WHEN LOWER(i.name) LIKE ? THEN 0 ELSE 1 END, i.name ASC LIMIT 300";
+        $brand_query = "SELECT i.*, COALESCE(NULLIF(i.agency_name,''), s.name) as agency_name FROM inventory i LEFT JOIN agency_suppliers s ON i.supplier_id = s.id WHERE LOWER(TRIM(REPLACE(i.generic_name, 0xEFBBBF, ''))) IN (SELECT DISTINCT LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) FROM generic_mappings WHERE LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) LIKE ? OR LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) LIKE ? OR LOWER(TRIM(REPLACE(brand_name, 0xEFBBBF, ''))) LIKE ? OR LOWER(TRIM(REPLACE(brand_name, 0xEFBBBF, ''))) LIKE ?) ORDER BY CASE WHEN LOWER(TRIM(REPLACE(i.name, 0xEFBBBF, ''))) LIKE ? THEN 0 ELSE 1 END, i.name ASC LIMIT 300";
         $stmt_brands = $conn->prepare($brand_query);
-        $stmt_brands->execute([strtolower("$q%"), strtolower("$q%"), strtolower("$q%")]);
+        $stmt_brands->execute([strtolower("$q%"), strtolower("% $q%"), strtolower("$q%"), strtolower("% $q%"), strtolower("$q%")]);
         $brand_batches = $stmt_brands->fetchAll(PDO::FETCH_ASSOC);
         
         // Merge direct inventory matches (from $results) so searching by Brand Name works
