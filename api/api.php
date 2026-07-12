@@ -1367,16 +1367,17 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     $category = $_GET['category'] ?? ''; // NEW
     $conn = get_db();
     
+    // Auto-sync generic mappings to ensure live lookup is up-to-date
+    sync_generic_mappings($conn);
+    
     $query = "SELECT i.*, COALESCE(NULLIF(i.agency_name,''), s.name) as agency_name FROM inventory i LEFT JOIN agency_suppliers s ON i.supplier_id = s.id";
     $params = [];
     $conditions = [];
     
     if ($q) {
-        $conditions[] = "(LOWER(TRIM(REPLACE(i.name, 0xEFBBBF, ''))) LIKE ? OR LOWER(TRIM(REPLACE(i.name, 0xEFBBBF, ''))) LIKE ? OR LOWER(TRIM(REPLACE(i.generic_name, 0xEFBBBF, ''))) LIKE ? OR LOWER(TRIM(REPLACE(i.generic_name, 0xEFBBBF, ''))) LIKE ?)";
-        $params[] = strtolower("$q%");
-        $params[] = strtolower("% $q%");
-        $params[] = strtolower("$q%");
-        $params[] = strtolower("% $q%");
+        $conditions[] = "(LOWER(TRIM(REPLACE(i.name, 0xEFBBBF, ''))) LIKE ? OR LOWER(TRIM(REPLACE(i.generic_name, 0xEFBBBF, ''))) LIKE ?)";
+        $params[] = strtolower("%$q%");
+        $params[] = strtolower("%$q%");
     }
     // User request: Do NOT filter by stock, price, etc. in search dropdown
     // if (!$include_all) {
@@ -1409,11 +1410,9 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     $gm_conditions = [];
     $gm_params = [];
     if ($q) {
-        $gm_conditions[] = "(LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) LIKE ? OR LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) LIKE ? OR LOWER(TRIM(REPLACE(brand_name, 0xEFBBBF, ''))) LIKE ? OR LOWER(TRIM(REPLACE(brand_name, 0xEFBBBF, ''))) LIKE ?)";
-        $gm_params[] = strtolower("$q%");
-        $gm_params[] = strtolower("% $q%");
-        $gm_params[] = strtolower("$q%");
-        $gm_params[] = strtolower("% $q%");
+        $gm_conditions[] = "(LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) LIKE ? OR LOWER(TRIM(REPLACE(brand_name, 0xEFBBBF, ''))) LIKE ?)";
+        $gm_params[] = strtolower("%$q%");
+        $gm_params[] = strtolower("%$q%");
     }
     if ($category === 'medicine') {
         $gm_conditions[] = "((category IS NULL OR category NOT IN ('Injection', 'INJ', 'IV')) AND LOWER(generic_name) NOT LIKE '%(inj)%')";
@@ -1444,8 +1443,8 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     // ── BUG FIX: Also pick up generics that exist in agency_items but have not
     // yet been synced into generic_mappings (e.g. just created via /api/generics/add).
     if ($q) {
-        $ai_conditions = ["LOWER(TRIM(REPLACE(item_name, 0xEFBBBF, ''))) = '(unmapped brand)'", "generic_name IS NOT NULL", "TRIM(generic_name) != ''", "(LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) LIKE ? OR LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) LIKE ?)"];
-        $ai_params     = [strtolower("$q%"), strtolower("% $q%")];
+        $ai_conditions = ["LOWER(TRIM(REPLACE(item_name, 0xEFBBBF, ''))) = '(unmapped brand)'", "generic_name IS NOT NULL", "TRIM(generic_name) != ''", "LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) LIKE ?"];
+        $ai_params     = [strtolower("%$q%")];
         if ($category === 'medicine') {
             $ai_conditions[] = "((category IS NULL OR category NOT IN ('Injection', 'INJ', 'IV')) AND LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) NOT LIKE '%(inj)%')";
         } elseif ($category === 'Injection' || $category === 'INJ') {
@@ -1493,9 +1492,9 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
 
     // Load matching batches directly if search is empty or we want to populate the sub-results
     if ($q) {
-        $brand_query = "SELECT i.*, COALESCE(NULLIF(i.agency_name,''), s.name) as agency_name FROM inventory i LEFT JOIN agency_suppliers s ON i.supplier_id = s.id WHERE LOWER(TRIM(REPLACE(i.generic_name, 0xEFBBBF, ''))) IN (SELECT DISTINCT LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) FROM generic_mappings WHERE LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) LIKE ? OR LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) LIKE ? OR LOWER(TRIM(REPLACE(brand_name, 0xEFBBBF, ''))) LIKE ? OR LOWER(TRIM(REPLACE(brand_name, 0xEFBBBF, ''))) LIKE ?) ORDER BY CASE WHEN LOWER(TRIM(REPLACE(i.name, 0xEFBBBF, ''))) LIKE ? THEN 0 ELSE 1 END, i.name ASC LIMIT 300";
+        $brand_query = "SELECT i.*, COALESCE(NULLIF(i.agency_name,''), s.name) as agency_name FROM inventory i LEFT JOIN agency_suppliers s ON i.supplier_id = s.id WHERE LOWER(TRIM(REPLACE(i.generic_name, 0xEFBBBF, ''))) IN (SELECT DISTINCT LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) FROM generic_mappings WHERE LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) LIKE ? OR LOWER(TRIM(REPLACE(brand_name, 0xEFBBBF, ''))) LIKE ?) ORDER BY CASE WHEN LOWER(TRIM(REPLACE(i.name, 0xEFBBBF, ''))) LIKE ? THEN 0 ELSE 1 END, i.name ASC LIMIT 300";
         $stmt_brands = $conn->prepare($brand_query);
-        $stmt_brands->execute([strtolower("$q%"), strtolower("% $q%"), strtolower("$q%"), strtolower("% $q%"), strtolower("$q%")]);
+        $stmt_brands->execute([strtolower("%$q%"), strtolower("%$q%"), strtolower("$q%")]);
         $brand_batches = $stmt_brands->fetchAll(PDO::FETCH_ASSOC);
         
         // Merge direct inventory matches (from $results) so searching by Brand Name works
@@ -5981,6 +5980,7 @@ if ($uri === '/api/agency_medicine_list' && $method === 'GET') {
 if ($uri === '/api/generics/add' && $method === 'POST') {
     enforce_api_auth(['pharmacist']);
     $generic = trim($input['generic_name'] ?? '');
+    $category = trim($input['category'] ?? 'TAB');
 
     if ($generic === '') {
         json_response(['error' => 'Item name cannot be empty.'], 400);
@@ -6003,9 +6003,9 @@ if ($uri === '/api/generics/add' && $method === 'POST') {
         $stmt = $conn->prepare("
             INSERT INTO agency_items
                 (item_name, generic_name, batch_number, stock, mrp, category, brand_name)
-            VALUES ('(Unmapped Brand)', ?, ?, 0, 0.00, 'TAB', '(Unmapped Brand)')
+            VALUES ('(Unmapped Brand)', ?, ?, 0, 0.00, ?, '(Unmapped Brand)')
         ");
-        $stmt->execute([$generic, $placeholder_batch]);
+        $stmt->execute([$generic, $placeholder_batch, $category]);
 
         // Audit trail
         $conn->prepare("
@@ -6018,6 +6018,9 @@ if ($uri === '/api/generics/add' && $method === 'POST') {
             $generic,
             "Manually added generic medicine: $generic"
         ]);
+
+        // Auto-sync generic mappings to ensure live list is up-to-date
+        sync_generic_mappings($conn);
 
         json_response([
             'success' => true,
