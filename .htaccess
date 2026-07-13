@@ -1,5 +1,15 @@
 RewriteEngine On
 
+# Disable caching for JS and CSS files to prevent deployment sync issues
+<FilesMatch "\.(js|css)$">
+    FileETag None
+    <IfModule mod_headers.c>
+        Header set Cache-Control "max-age=0, no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "Wed, 11 Jan 1984 05:00:00 GMT"
+    </IfModule>
+</FilesMatch>
+
 # 1. Protect the SQLite Database from being downloaded
 <FilesMatch "\.(db|sqlite|sqlite3)$">
     Order allow,deny
