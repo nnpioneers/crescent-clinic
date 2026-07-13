@@ -5621,6 +5621,77 @@ if ($uri === '/api/generics/delete-generic' && $method === 'POST') {
 }
 
 /**
+ * POST /api/generics/delete-multiple
+ * Body: { generic_names: ["...", "..."] }
+ * Clears the generic name (sets to NULL) for multiple generic medicines.
+ */
+if ($uri === '/api/generics/delete-multiple' && $method === 'POST') {
+    enforce_api_auth(['pharmacist']);
+    $generic_names = $input['generic_names'] ?? [];
+    if (!is_array($generic_names) || empty($generic_names)) {
+        json_response(['error' => 'generic_names is required and must be a non-empty array'], 400);
+    }
+    
+    $conn = get_db();
+    try {
+        $conn->beginTransaction();
+
+        $agency_rows_total = 0;
+        $inv_rows_total = 0;
+
+        $stmt = $conn->prepare("
+            UPDATE agency_items SET generic_name = NULL 
+            WHERE TRIM(LOWER(generic_name)) = TRIM(LOWER(?))
+        ");
+
+        $stmt2 = $conn->prepare("
+            UPDATE inventory SET generic_name = NULL 
+            WHERE TRIM(LOWER(generic_name)) = TRIM(LOWER(?))
+        ");
+
+        $stmt3 = $conn->prepare("
+            DELETE FROM generic_mappings 
+            WHERE TRIM(LOWER(generic_name)) = TRIM(LOWER(?))
+        ");
+
+        foreach ($generic_names as $generic_name) {
+            $generic_name = trim($generic_name);
+            if ($generic_name === '') continue;
+
+            $stmt->execute([$generic_name]);
+            $agency_rows_total += $stmt->rowCount();
+
+            $stmt2->execute([$generic_name]);
+            $inv_rows_total += $stmt2->rowCount();
+
+            $stmt3->execute([$generic_name]);
+        }
+
+        // Audit trail
+        $names_str = implode(', ', $generic_names);
+        $conn->prepare("
+            INSERT INTO agency_audit_trail
+                (user_id, action, table_name, record_id, old_value, new_value, details)
+            VALUES (?, 'GENERIC_BULK_DELETE', 'agency_items+inventory', 0, ?, NULL, ?)
+        ")->execute([
+            $_SESSION['user_id'] ?? 0,
+            substr($names_str, 0, 255),
+            "Bulk deleted " . count($generic_names) . " generic medicines. Cleared mappings across $agency_rows_total agency + $inv_rows_total inventory records."
+        ]);
+
+        $conn->commit();
+        json_response([
+            'success'     => true,
+            'message'     => "Selected generic medicines deleted. Cleared mappings across $agency_rows_total agency + $inv_rows_total inventory records."
+        ]);
+    } catch (Exception $e) {
+        if ($conn->inTransaction()) $conn->rollBack();
+        json_response(['success' => false, 'error' => $e->getMessage()], 500);
+    }
+}
+
+
+/**
  * POST /api/generics/rename-generic
  * Body: { old_name: "...", new_name: "..." }
  * Renames a generic medicine name across all mappings.

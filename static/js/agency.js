@@ -1785,12 +1785,16 @@ let gmFilteredData = []; // Store currently filtered list
 let gmCurrentPage = 1;
 const gmPageSize = 10;
 let gmSelectedGeneric = ''; // Track currently active generic in detail view
+let gmSelectedItems = new Set(); // Track selected items for bulk action
 
 
 
 // Load list of all unique generics with counts from the server
 async function loadGenericMedicines() {
     try {
+        gmSelectedItems.clear();
+        updateBulkDeleteButton();
+        
         // Reset to list view when tab is selected
         const listView = document.getElementById('gmListView');
         const detailView = document.getElementById('gmDetailView');
@@ -1910,7 +1914,7 @@ function renderGmList() {
     if (!tbody) return; // elements not in DOM yet
 
     if (paginatedItems.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:30px; color:var(--text-secondary);">No items found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:var(--text-secondary);">No items found.</td></tr>`;
         if (paginationEl) paginationEl.innerHTML = '';
         return;
     }
@@ -1918,6 +1922,7 @@ function renderGmList() {
     tbody.innerHTML = paginatedItems.map((item, index) => {
         const globalIdx = start + index + 1;
         const genericEscaped = (item.generic_name || '').replace(/'/g, "\\'");
+        const isChecked = gmSelectedItems.has(item.generic_name) ? 'checked' : '';
         return `
             <tr>
                 <td>${globalIdx}</td>
@@ -1928,9 +1933,20 @@ function renderGmList() {
                     <button class="btn btn-outline btn-sm" style="margin-left:6px;" onclick="gmEditGenericName('${genericEscaped}')">Edit</button>
                     <button class="btn btn-outline btn-sm" style="color:var(--danger); margin-left:6px;" onclick="gmDeleteGeneric('${genericEscaped}')">Delete</button>
                 </td>
+                <td style="text-align:center;">
+                    <input type="checkbox" class="gm-item-checkbox" data-generic="${genericEscaped}" ${isChecked} onchange="gmOnRowSelect(this)" style="cursor: pointer; transform: scale(1.1);">
+                </td>
             </tr>
         `;
     }).join('');
+
+    // Update Select All checkbox state
+    const selectAllCb = document.getElementById('gmSelectAll');
+    if (selectAllCb) {
+        const allVisibleSelected = paginatedItems.length > 0 && paginatedItems.every(item => gmSelectedItems.has(item.generic_name));
+        selectAllCb.checked = allVisibleSelected;
+    }
+    updateBulkDeleteButton();
 
     renderGmPagination();
 }
@@ -1968,6 +1984,88 @@ function gmGoToPage(page) {
     gmCurrentPage = page;
     renderGmList();
 }
+
+// Bulk Actions Helper Functions
+function updateBulkDeleteButton() {
+    const btn = document.getElementById('gmBulkDeleteBtn');
+    if (!btn) return;
+    if (gmSelectedItems.size > 0) {
+        btn.style.display = 'inline-block';
+        btn.textContent = `🗑️ Delete Selected (${gmSelectedItems.size})`;
+    } else {
+        btn.style.display = 'none';
+    }
+}
+
+window.gmToggleSelectAll = function(source) {
+    const start = (gmCurrentPage - 1) * gmPageSize;
+    const end = start + gmPageSize;
+    const paginatedItems = gmFilteredData.slice(start, end);
+    
+    paginatedItems.forEach(item => {
+        if (source.checked) {
+            gmSelectedItems.add(item.generic_name);
+        } else {
+            gmSelectedItems.delete(item.generic_name);
+        }
+    });
+    
+    const checkboxes = document.querySelectorAll('.gm-item-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = source.checked;
+    });
+    
+    updateBulkDeleteButton();
+};
+
+window.gmOnRowSelect = function(cb) {
+    const generic = cb.getAttribute('data-generic');
+    if (cb.checked) {
+        gmSelectedItems.add(generic);
+    } else {
+        gmSelectedItems.delete(generic);
+    }
+    
+    const start = (gmCurrentPage - 1) * gmPageSize;
+    const end = start + gmPageSize;
+    const paginatedItems = gmFilteredData.slice(start, end);
+    const selectAllCb = document.getElementById('gmSelectAll');
+    if (selectAllCb) {
+        const allVisibleSelected = paginatedItems.length > 0 && paginatedItems.every(item => gmSelectedItems.has(item.generic_name));
+        selectAllCb.checked = allVisibleSelected;
+    }
+    
+    updateBulkDeleteButton();
+};
+
+window.gmBulkDelete = async function() {
+    if (gmSelectedItems.size === 0) return;
+    
+    const count = gmSelectedItems.size;
+    const confirmMessage = `Are you sure you want to delete ${count} selected Generic Medicines?\n\nThis action will clear generic mapping for all brand medicines and inventory items mapped to these generics.\n\nThis action cannot be undone.`;
+    if (!confirm(confirmMessage)) {
+        return;
+    }
+    
+    try {
+        const genericNames = Array.from(gmSelectedItems);
+        const res = await api('/api/generics/delete-multiple', {
+            method: 'POST',
+            body: { generic_names: genericNames }
+        });
+        
+        if (res.success) {
+            toast(res.message || 'Selected generic medicines deleted successfully.', 'success');
+            gmSelectedItems.clear();
+            updateBulkDeleteButton();
+            loadGenericMedicines();
+        } else {
+            toast(res.error || 'Failed to delete selected generic medicines.', 'error');
+        }
+    } catch (e) {
+        toast(e.message || 'Failed to delete selected generic medicines.', 'error');
+    }
+};
 
 // View details for a selected generic medicine
 async function gmViewBrands(genericName) {

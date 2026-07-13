@@ -75,6 +75,7 @@
                                 style="background:linear-gradient(135deg,#10b981,#059669); border:none;">+ Add Item</button>
                             <button class="btn btn-primary btn-sm" onclick="document.getElementById('gmImportPdfInput').click()" title="Import Items from PDF" style="background:linear-gradient(135deg,#e11d48,#be123c); border:none;">📄 Import PDF</button>
                             <input type="file" id="gmImportPdfInput" accept=".pdf" style="display:none;" onchange="handleGenericImportPdf(this)">
+                            <button class="btn btn-danger btn-sm" id="gmBulkDeleteBtn" onclick="gmBulkDelete()" style="background:linear-gradient(135deg,#ef4444,#dc2626); border:none; display:none; color:white;">🗑️ Delete Selected</button>
                         </div>
                     </div>
 
@@ -105,10 +106,14 @@
                                         <th>Item Name</th>
                                         <th style="width:130px; text-align:center;">Brand Medicines</th>
                                         <th style="width:120px;">Action</th>
+                                        <th style="width:100px; text-align:center;">
+                                            Select <br>
+                                            <input type="checkbox" id="gmSelectAll" onclick="gmToggleSelectAll(this)" style="cursor: pointer; transform: scale(1.1); margin-top:4px;">
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody id="gmListBody">
-                                    <tr><td colspan="4" style="text-align:center; padding:30px; color:var(--text-secondary);">Loading…</td></tr>
+                                    <tr><td colspan="5" style="text-align:center; padding:30px; color:var(--text-secondary);">Loading…</td></tr>
                                 </tbody>
                             </table>
                         </div>
