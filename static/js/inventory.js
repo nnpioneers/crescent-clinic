@@ -83,7 +83,7 @@
             const isTablet = catLower === 'tablet' || catLower === 'tab' || catLower === 'tablets';
 
             if (isTablet) {
-                labelStock.textContent = 'Current Stock';
+                labelStock.textContent = 'Current Stock (Strips)';
                 if (labelStockUnit) labelStockUnit.style.display = 'block';
                 if (groupTPS) groupTPS.style.display = 'block';
                 if (groupTotal) groupTotal.style.display = 'block';
@@ -291,6 +291,7 @@
             const wbFlag = document.getElementById('invIsWithoutBrand');
             if (wbFlag) wbFlag.value = item.is_without_brand ? '1' : '0';
             toggleInventoryFields();
+            document.getElementById('invTotalTablets').value = item.stock || 0;
             openModal('invModal');
         }
 
