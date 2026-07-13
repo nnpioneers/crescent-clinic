@@ -5829,14 +5829,29 @@ if ($uri === '/api/generics/rename-generic' && $method === 'POST') {
     $conn = get_db();
     try {
         $conn->beginTransaction();
-        
+        $category = trim($input['category'] ?? '');
+        $old_wb_name = $old_name . ' (Without Brand)';
+        $new_wb_name = $new_name . ' (Without Brand)';
+
         // Update agency_items
-        $stmt1 = $conn->prepare("UPDATE agency_items SET generic_name = ? WHERE TRIM(LOWER(generic_name)) = TRIM(LOWER(?))");
-        $stmt1->execute([$new_name, $old_name]);
+        if ($category !== '') {
+            $stmt1 = $conn->prepare("UPDATE agency_items SET generic_name = ?, category = ? WHERE TRIM(LOWER(generic_name)) = TRIM(LOWER(?))");
+            $stmt1->execute([$new_name, $category, $old_name]);
+        } else {
+            $stmt1 = $conn->prepare("UPDATE agency_items SET generic_name = ? WHERE TRIM(LOWER(generic_name)) = TRIM(LOWER(?))");
+            $stmt1->execute([$new_name, $old_name]);
+        }
+        $conn->prepare("UPDATE agency_items SET item_name = ?, brand_name = ? WHERE TRIM(LOWER(item_name)) = TRIM(LOWER(?))")->execute([$new_wb_name, $new_wb_name, $old_wb_name]);
         
         // Update inventory
-        $stmt2 = $conn->prepare("UPDATE inventory SET generic_name = ? WHERE TRIM(LOWER(generic_name)) = TRIM(LOWER(?))");
-        $stmt2->execute([$new_name, $old_name]);
+        if ($category !== '') {
+            $stmt2 = $conn->prepare("UPDATE inventory SET generic_name = ?, category = ? WHERE TRIM(LOWER(generic_name)) = TRIM(LOWER(?))");
+            $stmt2->execute([$new_name, $category, $old_name]);
+        } else {
+            $stmt2 = $conn->prepare("UPDATE inventory SET generic_name = ? WHERE TRIM(LOWER(generic_name)) = TRIM(LOWER(?))");
+            $stmt2->execute([$new_name, $old_name]);
+        }
+        $conn->prepare("UPDATE inventory SET name = ? WHERE TRIM(LOWER(name)) = TRIM(LOWER(?))")->execute([$new_wb_name, $old_wb_name]);
         
         // Update generic_mappings
         $stmt3 = $conn->prepare("UPDATE generic_mappings SET generic_name = ? WHERE TRIM(LOWER(generic_name)) = TRIM(LOWER(?))");
@@ -5851,7 +5866,7 @@ if ($uri === '/api/generics/rename-generic' && $method === 'POST') {
             $_SESSION['user_id'] ?? 0,
             $old_name,
             $new_name,
-            "Renamed generic medicine from '$old_name' to '$new_name'."
+            "Renamed generic medicine from '$old_name' to '$new_name'." . ($category !== '' ? " Category synced to '$category'." : "")
         ]);
         
         $conn->commit();
