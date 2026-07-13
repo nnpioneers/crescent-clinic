@@ -2788,7 +2788,7 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
                 $tps = max(1, (int)$inv_batches[$batch_id]['tablets_per_strip']);
             } else {
                 $unit_cost = $inv_costs[$name] ?? 0;
-                $tps = max(1, (int)$inv_tps[$name] ?? 1);
+                $tps = max(1, (int)($inv_tps[$name] ?? 1));
             }
             $actual_unit_cost = $unit_cost / $tps;
             $total_cost = $actual_unit_cost * $qty;
@@ -2968,7 +2968,7 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
                 $tps = max(1, (int)$inv_batches[$batch_id]['tablets_per_strip']);
             } else {
                 $unit_cost = $inv_costs[$name] ?? 0;
-                $tps = max(1, (int)$inv_tps[$name] ?? 1);
+                $tps = max(1, (int)($inv_tps[$name] ?? 1));
             }
             $actual_unit_cost = $unit_cost / $tps;
             $qty = (float)($m['qty'] ?? 0) - (float)($m['returned_qty'] ?? 0);
