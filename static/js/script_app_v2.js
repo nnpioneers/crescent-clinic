@@ -1711,8 +1711,10 @@ window.onunhandledrejection = function(event) {
 
         try {
             const items = await api(`/api/inventory/search?category=${encodeURIComponent(category)}&q=${encodeURIComponent(q)}`);
-            if (items.length > 0) {
-                suggBox.innerHTML = items.map(item => {
+            const validItems = items.filter(item => !item.is_generic_header);
+            
+            if (validItems.length > 0) {
+                suggBox.innerHTML = validItems.map(item => {
                     const price = item.selling_price || 0;
                     return `
                     <div class="med-sugg-item" style="padding:10px 12px; cursor:pointer; border-bottom:1px solid var(--border); transition: background 0.15s; background: var(--bg-card); color: var(--text-primary);" 
