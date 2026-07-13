@@ -145,7 +145,7 @@ function ensure_synthesized_inventory($conn, $name) {
     if (!$stmt->fetch()) {
         $gen_name = trim(str_replace(' (Without Brand)', '', $name));
         
-        // Check if an '(Unmapped Brand)' default record already exists for this generic in inventory
+        // 1. Check if an '(Unmapped Brand)' default record already exists for this generic in inventory
         $stmt_um = $conn->prepare("SELECT id, batch_number FROM inventory WHERE (name = '(Unmapped Brand)' OR name = '(unmapped brand)') AND TRIM(LOWER(generic_name)) = TRIM(LOWER(?)) LIMIT 1");
         $stmt_um->execute([$gen_name]);
         $row_um = $stmt_um->fetch();
@@ -161,10 +161,26 @@ function ensure_synthesized_inventory($conn, $name) {
             $conn->prepare("UPDATE agency_items SET item_name = ? WHERE (item_name = '(Unmapped Brand)' OR item_name = '(unmapped brand)') AND TRIM(LOWER(generic_name)) = TRIM(LOWER(?)) AND batch_number = ?")
                  ->execute([$name, $gen_name, $batch_num]);
         } else {
-            // Create a new record from scratch
-            $ph_batch = 'ph_' . substr(md5(uniqid()), 0, 8);
-            $stmt2 = $conn->prepare("INSERT IGNORE INTO inventory (name, generic_name, brand_name, stock, batch_number, category) VALUES (?, ?, '(Unmapped Brand)', 0, ?, 'Tablet')");
-            $stmt2->execute([$name, $gen_name, $ph_batch]);
+            // 2. If not in inventory, check if it exists in agency_items
+            $stmt_ai = $conn->prepare("SELECT id, batch_number FROM agency_items WHERE (item_name = '(Unmapped Brand)' OR item_name = '(unmapped brand)') AND TRIM(LOWER(generic_name)) = TRIM(LOWER(?)) LIMIT 1");
+            $stmt_ai->execute([$gen_name]);
+            $row_ai = $stmt_ai->fetch();
+            
+            if ($row_ai) {
+                $batch_num = $row_ai['batch_number'];
+                
+                // Rename in agency_items
+                $conn->prepare("UPDATE agency_items SET item_name = ? WHERE id = ?")->execute([$name, $row_ai['id']]);
+                
+                // Insert in inventory with the SAME batch number
+                $stmt_ins = $conn->prepare("INSERT IGNORE INTO inventory (name, generic_name, brand_name, stock, batch_number, category) VALUES (?, ?, '(Unmapped Brand)', 0, ?, 'Tablet')");
+                $stmt_ins->execute([$name, $gen_name, $batch_num]);
+            } else {
+                // 3. Create a new record from scratch
+                $ph_batch = 'ph_' . substr(md5(uniqid()), 0, 8);
+                $stmt2 = $conn->prepare("INSERT IGNORE INTO inventory (name, generic_name, brand_name, stock, batch_number, category) VALUES (?, ?, '(Unmapped Brand)', 0, ?, 'Tablet')");
+                $stmt2->execute([$name, $gen_name, $ph_batch]);
+            }
         }
     }
 }
@@ -5087,6 +5103,38 @@ function sync_generic_mappings($conn) {
             DELETE FROM agency_items 
             WHERE (batch_number IS NULL OR batch_number = '-' OR batch_number = '')
               AND item_name IN (SELECT * FROM (SELECT item_name FROM agency_items WHERE batch_number = 'manual_default') AS tmp)
+        ");
+
+        // Self-heal redundant '(Unmapped Brand)' placeholder rows if a '(Without Brand)' row exists for the same generic
+        $conn->exec("
+            DELETE FROM agency_items 
+            WHERE (item_name = '(Unmapped Brand)' OR item_name = '(unmapped brand)')
+              AND TRIM(LOWER(generic_name)) IN (
+                  SELECT * FROM (
+                      SELECT DISTINCT TRIM(LOWER(generic_name)) FROM agency_items 
+                      WHERE item_name LIKE '%(Without Brand)%'
+                  ) AS tmp
+              )
+        ");
+        $conn->exec("
+            DELETE FROM inventory 
+            WHERE (name = '(Unmapped Brand)' OR name = '(unmapped brand)')
+              AND TRIM(LOWER(generic_name)) IN (
+                  SELECT * FROM (
+                      SELECT DISTINCT TRIM(LOWER(generic_name)) FROM inventory 
+                      WHERE name LIKE '%(Without Brand)%'
+                  ) AS tmp
+              )
+        ");
+        $conn->exec("
+            DELETE FROM generic_mappings 
+            WHERE (brand_name = '(Unmapped Brand)' OR brand_name = '(unmapped brand)')
+              AND TRIM(LOWER(generic_name)) IN (
+                  SELECT * FROM (
+                      SELECT DISTINCT TRIM(LOWER(generic_name)) FROM generic_mappings 
+                      WHERE brand_name LIKE '%(Without Brand)%'
+                  ) AS tmp
+              )
         ");
 
     } catch (Exception $e) {
