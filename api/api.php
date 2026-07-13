@@ -2044,11 +2044,11 @@ if ($uri === '/api/inventory/auto_create_brand' && $method === 'POST') {
         
         // 1. Insert into inventory (0 stock, but available for sale)
         $stmt = $conn->prepare("INSERT IGNORE INTO inventory (name, generic_name, mrp, selling_price, purchase_price, stock, category, batch_number) VALUES (?, ?, ?, ?, ?, 0, 'TAB', ?)");
-        $stmt->execute([$brand_name, $generic_name, $unit_price, $unit_price, $unit_price, $batch]);
+        $stmt->execute([$brand_name, $generic_name, $unit_price, $unit_price, 0, $batch]);
         
         // 2. Insert into agency_items
         $stmt2 = $conn->prepare("INSERT IGNORE INTO agency_items (item_name, generic_name, mrp, selling_price, purchase_price, stock, batch_number) VALUES (?, ?, ?, ?, ?, 0, ?)");
-        $stmt2->execute([$brand_name, $generic_name, $unit_price, $unit_price, $unit_price, $batch]);
+        $stmt2->execute([$brand_name, $generic_name, $unit_price, $unit_price, 0, $batch]);
         
         // 3. Update generic mappings
         $stmt3 = $conn->prepare("INSERT INTO generic_mappings (brand_name, generic_name, mrp, stock, batch_number) VALUES (?, ?, ?, 0, ?) ON DUPLICATE KEY UPDATE generic_name = VALUES(generic_name), mrp = VALUES(mrp)");
