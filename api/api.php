@@ -1564,9 +1564,23 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
 
     // Load matching batches directly if search is empty or we want to populate the sub-results
     if ($q) {
-        $brand_query = "SELECT i.*, COALESCE(NULLIF(i.agency_name,''), s.name) as agency_name FROM inventory i LEFT JOIN agency_suppliers s ON i.supplier_id = s.id WHERE LOWER(TRIM(REPLACE(i.generic_name, 0xEFBBBF, ''))) IN (SELECT DISTINCT LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) FROM generic_mappings WHERE LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) LIKE ? OR LOWER(TRIM(REPLACE(brand_name, 0xEFBBBF, ''))) LIKE ?) ORDER BY CASE WHEN LOWER(TRIM(REPLACE(i.name, 0xEFBBBF, ''))) LIKE ? THEN 0 ELSE 1 END, i.name ASC LIMIT 300";
+        $brand_conds = ["LOWER(TRIM(REPLACE(i.generic_name, 0xEFBBBF, ''))) IN (SELECT DISTINCT LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) FROM generic_mappings WHERE LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) LIKE ? OR LOWER(TRIM(REPLACE(brand_name, 0xEFBBBF, ''))) LIKE ?)"];
+        $brand_params = [strtolower("$q%"), strtolower("$q%")];
+
+        if ($category === 'medicine') {
+            $brand_conds[] = "((i.category IS NULL OR i.category NOT IN ('Injection', 'INJ', 'IV')) AND LOWER(i.name) NOT LIKE '%(inj)%' AND LOWER(i.generic_name) NOT LIKE '%(inj)%')";
+        } elseif ($category === 'Injection' || $category === 'INJ') {
+            $brand_conds[] = "(i.category IN ('Injection', 'INJ') OR LOWER(i.name) LIKE '%(inj)%' OR LOWER(i.generic_name) LIKE '%(inj)%')";
+        } elseif ($category) {
+            $brand_conds[] = "i.category = ?";
+            $brand_params[] = $category;
+        }
+
+        $brand_query = "SELECT i.*, COALESCE(NULLIF(i.agency_name,''), s.name) as agency_name FROM inventory i LEFT JOIN agency_suppliers s ON i.supplier_id = s.id WHERE " . implode(" AND ", $brand_conds) . " ORDER BY CASE WHEN LOWER(TRIM(REPLACE(i.name, 0xEFBBBF, ''))) LIKE ? THEN 0 ELSE 1 END, i.name ASC LIMIT 300";
+        $brand_params[] = strtolower("$q%");
+
         $stmt_brands = $conn->prepare($brand_query);
-        $stmt_brands->execute([strtolower("$q%"), strtolower("$q%"), strtolower("$q%")]);
+        $stmt_brands->execute($brand_params);
         $brand_batches = $stmt_brands->fetchAll(PDO::FETCH_ASSOC);
         
         // Merge direct inventory matches (from $results) so searching by Brand Name works
