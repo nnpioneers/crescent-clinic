@@ -6,6 +6,9 @@ header('Content-Type: text/plain');
 
 $generic = 'CONSEVEL';
 
+echo "Running sync...\n";
+sync_generic_mappings($conn);
+
 echo "--- INVENTORY RECORDS FOR $generic ---\n";
 $stmt = $conn->prepare("SELECT id, name, generic_name, brand_name, batch_number, stock FROM inventory WHERE TRIM(LOWER(generic_name)) = TRIM(LOWER(?)) OR TRIM(LOWER(name)) LIKE ?");
 $stmt->execute([$generic, '%' . strtolower($generic) . '%']);
