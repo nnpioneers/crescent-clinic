@@ -1612,7 +1612,8 @@ window.onunhandledrejection = function(event) {
         
         if (!newBrand) return toast('Please enter a Brand Name', 'error');
         
-        const genericName = row.querySelector('.med-name').value.trim();
+        const genericInput = (row ? (row.querySelector('.med-name') || row.querySelector('.inj-name') || row.querySelector('.iv-name')) : null) || wrapper.parentElement.querySelector('input[type="text"]');
+        const genericName = genericInput ? genericInput.value.trim() : '';
         const btn = wrapper.querySelector('button');
         if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
         
@@ -1622,14 +1623,14 @@ window.onunhandledrejection = function(event) {
                 body: { generic_name: genericName, brand_name: newBrand, unit_price: 0 }
             });
             if (res.success) {
-                row.querySelector('.med-name').value = newBrand;
+                if (genericInput) genericInput.value = newBrand;
                 wrapper.remove();
                 toast('New Brand successfully added to inventory!', 'success');
                 // Move focus to next input
-                const qtyInput = row.querySelector('.med-qty');
-                if (qtyInput) {
-                    qtyInput.focus();
-                    qtyInput.select();
+                const nextInput = row ? (row.querySelector('.med-qty') || row.querySelector('.inj-cost') || row.querySelector('.iv-cost')) : null;
+                if (nextInput) {
+                    nextInput.focus();
+                    nextInput.select();
                 }
             } else {
                 toast(res.error || res.message || 'Failed to add brand', 'error');
@@ -1712,22 +1713,38 @@ window.onunhandledrejection = function(event) {
         try {
             const items = await api(`/api/inventory/search?category=${encodeURIComponent(category)}&q=${encodeURIComponent(q)}`);
             const validItems = items.filter(item => !item.is_generic_header);
+            const genericHeader = items.find(item => item.is_generic_header);
             
-            if (validItems.length > 0) {
-                suggBox.innerHTML = validItems.map(item => {
-                    const price = item.selling_price || 0;
-                    return `
-                    <div class="med-sugg-item" style="padding:10px 12px; cursor:pointer; border-bottom:1px solid var(--border); transition: background 0.15s; background: var(--bg-card); color: var(--text-primary);" 
-                         onmouseenter="this.style.background='var(--bg-hover)'"
-                         onmouseleave="this.style.background='var(--bg-card)'"
-                         onclick="selectInventoryCategoryItem('${category}', '${item.name.replace(/'/g, "\\'")}', ${price}, '${inputEl.id}')">
-                        <div style="font-weight:600; margin-bottom:3px;">${item.name}</div>
-                          ${item.agency_name ? `<div style="font-size:0.8em; color:var(--text-secondary); margin-bottom:4px;">${item.agency_name}</div>` : ''}
-                        <div style="font-size:0.78rem; color:var(--text-secondary);">MRP: ₹${price.toFixed(2)} | Stock: ${item.stock}
-                            ${(item.row_location || item.col_location) ? ' | <span style="color:#6366f1;font-weight:600;">&#128205; Row: ' + (item.row_location || '-') + ' | Col: ' + (item.col_location || '-') + '</span>' : ''}
-                        </div>
-                    </div>`;
-                }).join('');
+            if (validItems.length > 0 || genericHeader) {
+                let html = '';
+                if (validItems.length > 0) {
+                    html += validItems.map(item => {
+                        const price = item.selling_price || 0;
+                        return `
+                        <div class="med-sugg-item" style="padding:10px 12px; cursor:pointer; border-bottom:1px solid var(--border); transition: background 0.15s; background: var(--bg-card); color: var(--text-primary);" 
+                             onmouseenter="this.style.background='var(--bg-hover)'"
+                             onmouseleave="this.style.background='var(--bg-card)'"
+                             onclick="selectInventoryCategoryItem('${category}', '${item.name.replace(/'/g, "\\'")}', ${price}, '${inputEl.id}')">
+                            <div style="font-weight:600; margin-bottom:3px;">${item.name}</div>
+                              ${item.agency_name ? `<div style="font-size:0.8em; color:var(--text-secondary); margin-bottom:4px;">${item.agency_name}</div>` : ''}
+                            <div style="font-size:0.78rem; color:var(--text-secondary);">MRP: ₹${price.toFixed(2)} | Stock: ${item.stock}
+                                ${(item.row_location || item.col_location) ? ' | <span style="color:#6366f1;font-weight:600;">&#128205; Row: ' + (item.row_location || '-') + ' | Col: ' + (item.col_location || '-') + '</span>' : ''}
+                            </div>
+                        </div>`;
+                    }).join('');
+                }
+                
+                if (genericHeader) {
+                    html += `
+                        <div class="med-sugg-item" style="padding:12px; cursor:pointer; border-bottom:1px solid var(--border); transition:background 0.15s; background:var(--bg-card);"
+                            onmouseenter="this.style.background='var(--bg-hover)'"
+                            onmouseleave="this.style.background='var(--bg-card)'"
+                            onclick="selectInventoryCategoryItem('${category}', '${genericHeader.name.replace(/'/g,"\\'")}', ${genericHeader.selling_price||0}, '${inputEl.id}', 1)">
+                            <div style="font-weight:600; color:#3b82f6; font-size:0.95em;">+ Add New Brand</div>
+                        </div>`;
+                }
+
+                suggBox.innerHTML = html;
                 suggBox.style.display = 'block';
             } else {
                 suggBox.style.display = 'none';
@@ -1737,11 +1754,32 @@ window.onunhandledrejection = function(event) {
         }
     };
 
-    window.selectInventoryCategoryItem = function (category, name, price, inputId) {
+    window.selectInventoryCategoryItem = function (category, name, price, inputId, isUnmapped = 0) {
         const input = $('#' + inputId);
         const suggBox = input ? input.nextElementSibling : null;
         if (input) input.value = name;
         if (suggBox) suggBox.style.display = 'none';
+
+        if (isUnmapped == 1 && input) {
+            const existing = input.parentNode.querySelector('.unmapped-brand-input');
+            if (existing) existing.remove();
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'unmapped-brand-input';
+            wrapper.style.marginTop = '8px';
+            wrapper.innerHTML = `<label style="font-size:0.85em; color:var(--text-secondary); margin-bottom:4px; display:block;">Brand Name</label>
+                                 <div style="display:flex; gap:6px;">
+                                     <input type="text" class="form-control med-new-brand" placeholder="Enter Brand Name" style="font-size:0.9em; border-color:#6366f1;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); saveNewBrandInline(this); }">
+                                     <button type="button" class="btn btn-primary btn-sm" style="padding:0 12px; height:auto; min-height:unset;" onclick="saveNewBrandInline(this)">Save</button>
+                                 </div>`;
+            input.parentNode.appendChild(wrapper);
+            
+            setTimeout(() => {
+                const newBrandInput = input.parentNode.querySelector('.med-new-brand');
+                if (newBrandInput) newBrandInput.focus();
+            }, 10);
+            return;
+        }
 
         // Find corresponding cost input
         let costInput = null;
