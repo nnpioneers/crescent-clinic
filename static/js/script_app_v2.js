@@ -1545,7 +1545,7 @@ window.onunhandledrejection = function(event) {
                 console.error('searchMedicine error:', e);
                 suggBox.style.display = 'none';
             }
-        }, 200);
+        }, 50);
     };
 
 
