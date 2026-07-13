@@ -2089,7 +2089,8 @@
                     <thead><tr><th>#</th><th>Medicine</th><th>Qty</th><th>Unit Price</th><th>Amount</th></tr></thead>
                     <tbody>${medicines.map((m, i) => {
                     const retQty = parseFloat(m.returned_qty) || 0;
-                    const qtyHtml = retQty > 0 ? `${m.qty} <span style="color:var(--danger);font-size:0.8rem;">(-${retQty})</span>` : m.qty;
+                    const displayStr = window.formatMedicineQuantity ? window.formatMedicineQuantity(m) : m.qty;
+                    const qtyHtml = retQty > 0 ? `${displayStr} <span style="color:var(--danger);font-size:0.8rem;">(-${retQty})</span>` : displayStr;
                     return `<tr>
                         <td>${i + 1}</td>
                         <td>${m.name}</td>
@@ -2693,7 +2694,8 @@
                         ? `<ul style="margin: 8px 0; padding-left: 20px; font-size: 0.9rem;">${medicines.map(m => {
                             const retQty = parseFloat(m.returned_qty) || 0;
                             const originalQty = parseFloat(m.qty) || 0;
-                            const qtyHtml = retQty > 0 ? `x${originalQty} <span style="color:var(--danger);font-size:0.8rem;">(-${retQty} returned)</span>` : `x${originalQty}`;
+                            const displayStr = window.formatMedicineQuantity ? window.formatMedicineQuantity(m) : originalQty;
+                            const qtyHtml = retQty > 0 ? `x${displayStr} <span style="color:var(--danger);font-size:0.8rem;">(-${retQty} returned)</span>` : `x${displayStr}`;
                             return `<li>${m.name} ${qtyHtml}</li>`;
                         }).join('')}</ul>`
                         : '<p style="font-size: 0.9rem; color: var(--text-muted);">No medicines prescribed</p>';
@@ -3552,11 +3554,12 @@
                                 const originalQty = parseFloat(m.qty) || 0;
                                 const qty = originalQty - ret;
                                 let medNameDisplay = m.name;
+                                let displayStr = window.formatMedicineQuantity ? window.formatMedicineQuantity(m) : originalQty;
                                 let qtyHtml = ``;
                                 if (ret > 0) {
-                                    qtyHtml = `<div style="font-size:0.85em; color:var(--text-muted);">Purchased: ${originalQty}</div><div style="font-size:0.85em; color:var(--danger);">Returned: -${ret}</div><div style="font-weight:bold; border-top:1px solid var(--border); margin-top:2px; padding-top:2px;">Net: ${qty}</div>`;
+                                    qtyHtml = `<div style="font-size:0.85em; color:var(--text-muted);">Purchased: ${displayStr}</div><div style="font-size:0.85em; color:var(--danger);">Returned: -${ret}</div><div style="font-weight:bold; border-top:1px solid var(--border); margin-top:2px; padding-top:2px;">Net: ${qty}</div>`;
                                 } else {
-                                    qtyHtml = `${originalQty}`;
+                                    qtyHtml = `${displayStr}`;
                                 }
 
                                 const revenue = parseFloat(m.revenue) || 0;
@@ -3689,11 +3692,12 @@
                                 const originalQty = parseFloat(m.qty) || 0;
                                 const qty = originalQty - ret;
                                 let medNameDisplay = m.name;
+                                let displayStr = window.formatMedicineQuantity ? window.formatMedicineQuantity(m) : originalQty;
                                 let qtyHtml = ``;
                                 if (ret > 0) {
-                                    qtyHtml = `<div style="font-size:0.85em; color:var(--text-muted);">Purchased: ${originalQty}</div><div style="font-size:0.85em; color:var(--danger);">Returned: -${ret}</div><div style="font-weight:bold; border-top:1px solid var(--border); margin-top:2px; padding-top:2px;">Net: ${qty}</div>`;
+                                    qtyHtml = `<div style="font-size:0.85em; color:var(--text-muted);">Purchased: ${displayStr}</div><div style="font-size:0.85em; color:var(--danger);">Returned: -${ret}</div><div style="font-weight:bold; border-top:1px solid var(--border); margin-top:2px; padding-top:2px;">Net: ${qty}</div>`;
                                 } else {
-                                    qtyHtml = `${originalQty}`;
+                                    qtyHtml = `${displayStr}`;
                                 }
 
                                 const cost = parseFloat(m.cost) || 0;
@@ -3881,11 +3885,12 @@
                             const originalQty = parseFloat(m.qty) || 0;
                             const qty = originalQty - ret;
                             let medNameDisplay = m.name;
+                            let displayStr = window.formatMedicineQuantity ? window.formatMedicineQuantity(m) : originalQty;
                             let qtyHtml = ``;
                             if (ret > 0) {
-                                qtyHtml = `<div style="font-size:0.85em; color:var(--text-muted);">Purchased: ${originalQty}</div><div style="font-size:0.85em; color:var(--danger);">Returned: -${ret}</div><div style="font-weight:bold; border-top:1px solid var(--border); margin-top:2px; padding-top:2px;">Net: ${qty}</div>`;
+                                qtyHtml = `<div style="font-size:0.85em; color:var(--text-muted);">Purchased: ${displayStr}</div><div style="font-size:0.85em; color:var(--danger);">Returned: -${ret}</div><div style="font-weight:bold; border-top:1px solid var(--border); margin-top:2px; padding-top:2px;">Net: ${qty}</div>`;
                             } else {
-                                qtyHtml = `${originalQty}`;
+                                qtyHtml = `${displayStr}`;
                             }
 
                             const billCell = idx === 0 ? `₹${bill.toFixed(2)}` : '';

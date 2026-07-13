@@ -9,6 +9,23 @@ if (!String.prototype.toFixed) {
     };
 }
 
+// Global Helper for Formatting Quantities
+window.formatMedicineQuantity = function(m) {
+    let qty = parseFloat(m.qty) || 0;
+    let strips = parseFloat(m.strips) || 0;
+    let tablets = parseFloat(m.tablets) || 0;
+    
+    if (m.strips !== undefined || m.tablets !== undefined) {
+        if (strips > 0 || tablets > 0) {
+            let parts = [];
+            if (strips > 0) parts.push(strips + ' (S)');
+            if (tablets > 0) parts.push(tablets + ' (T)');
+            return parts.join(', ');
+        }
+    }
+    return qty;
+};
+
 // Global Error Handling for Frontend Stability
 window.onerror = function(message, source, lineno, colno, error) {
     console.error("Caught JS Error:", message, "at", source, lineno + ":" + colno);
@@ -1985,7 +2002,7 @@ window.onunhandledrejection = function(event) {
             // A row is valid if it has a name — qty may be 0 for newly created
             // "Without Brand" medicines where pricing/stock is filled in later.
             // Only skip rows that are completely empty (no name at all).
-            if (name) medicines.push({ name, qty: totalQty, unit_price, amount, batch_id, tps });
+            if (name) medicines.push({ name, qty: totalQty, unit_price, amount, batch_id, tps, strips, tablets });
         });
 
         let injCost = 0;
@@ -3412,7 +3429,7 @@ window.onunhandledrejection = function(event) {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${m.name}</td>
-                <td>${soldQty}</td>
+                <td>${window.formatMedicineQuantity(m)}</td>
                 <td style="color:var(--danger);">${alreadyReturned}</td>
                 <td style="font-weight:bold;">${available}</td>
                 <td>₹${unitPrice.toFixed(2)}</td>

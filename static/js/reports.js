@@ -117,7 +117,7 @@ function renderReportDashboard(data) {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${m.name}</td>
-                    <td>${m.qty}</td>
+                    <td>${window.formatMedicineQuantity ? window.formatMedicineQuantity(m) : m.qty}</td>
                     <td>₹${(m.revenue || 0).toFixed(2)}</td>
                 `;
                 medTbody.appendChild(tr);
@@ -708,7 +708,7 @@ function generatePrintableReport(data, period, start, end, format = 'print') {
                     ${data.top_medicines && data.top_medicines.length > 0 ? data.top_medicines.map(m => `
                         <tr>
                             <td>${m.name}</td>
-                            <td class="text-center">${m.qty}</td>
+                            <td class="text-center">${window.formatMedicineQuantity ? window.formatMedicineQuantity(m) : m.qty}</td>
                             <td class="text-right">₹${(m.revenue || 0).toFixed(2)}</td>
                         </tr>
                     `).join('') : '<tr><td colspan="3" class="text-center">No medicine sales found</td></tr>'}
@@ -1318,7 +1318,7 @@ function showPatientReportDetailsByIndex(index) {
             return `
                             <tr>
                                 <td>${m.name}</td>
-                                <td>${m.qty}</td>
+                                <td>${window.formatMedicineQuantity ? window.formatMedicineQuantity(m) : m.qty}</td>
                                 <td>${retQty > 0 ? `<span style="color:var(--danger); font-weight:600;">${retQty}</span>` : '0'}</td>
                                 <td style="text-align:right">${retAmt > 0 ? `<span style="color:var(--danger)">-₹${retAmt.toFixed(2)}</span>` : '₹0.00'}</td>
                             </tr>
@@ -1419,7 +1419,7 @@ function showDirectSaleReportDetailsByIndex(index) {
             return `
                             <tr>
                                 <td>${m.name}</td>
-                                <td>${m.qty}</td>
+                                <td>${window.formatMedicineQuantity ? window.formatMedicineQuantity(m) : m.qty}</td>
                                 <td>${retQty > 0 ? `<span style="color:var(--danger); font-weight:600;">${retQty}</span>` : '0'}</td>
                                 <td style="text-align:right">${retAmt > 0 ? `<span style="color:var(--danger)">-₹${retAmt.toFixed(2)}</span>` : '₹0.00'}</td>
                             </tr>
