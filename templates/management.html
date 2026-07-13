@@ -1256,7 +1256,7 @@
                     </div>
 
                     <div class="form-row">
-                        <div class="form-group">
+                        <div class="form-group" id="userRoleGroup">
                             <label>System Access Role / Designation *</label>
                             <input type="text" id="userRole" required oninput="toggleUserTypeFields()"
                                 placeholder="Type role (e.g. Nurse, receptionist)">
@@ -3140,12 +3140,19 @@
 
             const specLabel = document.getElementById('specializationLabel');
             const specInput = document.getElementById('userSpecialization');
+            const roleGroup = document.getElementById('userRoleGroup');
+            const specGroup = document.getElementById('specializationGroup');
+
             if (role === 'doctor') {
                 specLabel.textContent = 'Doctor Specialization / Department';
                 specInput.placeholder = 'e.g. General Physician, Skin Specialist';
+                if (roleGroup) roleGroup.style.display = 'none';
+                if (specGroup) specGroup.style.gridColumn = 'span 2';
             } else {
                 specLabel.textContent = 'Custom Role Name / Designation';
                 specInput.placeholder = 'e.g. Receptionist 1, Nurse, Manager';
+                if (roleGroup) roleGroup.style.display = 'block';
+                if (specGroup) specGroup.style.gridColumn = 'auto';
             }
         }
 
