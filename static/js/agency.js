@@ -1922,6 +1922,7 @@ function renderGmList() {
     tbody.innerHTML = paginatedItems.map((item, index) => {
         const globalIdx = start + index + 1;
         const genericEscaped = (item.generic_name || '').replace(/'/g, "\\'");
+        const genericAttr = (item.generic_name || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
         const isChecked = gmSelectedItems.has(item.generic_name) ? 'checked' : '';
         return `
             <tr>
@@ -1934,7 +1935,7 @@ function renderGmList() {
                     <button class="btn btn-outline btn-sm" style="color:var(--danger); margin-left:6px;" onclick="gmDeleteGeneric('${genericEscaped}')">Delete</button>
                 </td>
                 <td style="text-align:center;">
-                    <input type="checkbox" class="gm-item-checkbox" data-generic="${genericEscaped}" ${isChecked} onchange="gmOnRowSelect(this)" style="cursor: pointer; transform: scale(1.1);">
+                    <input type="checkbox" class="gm-item-checkbox" data-generic="${genericAttr}" ${isChecked} onchange="gmOnRowSelect(this)" style="cursor: pointer; transform: scale(1.1);">
                 </td>
             </tr>
         `;
@@ -1986,6 +1987,13 @@ function gmGoToPage(page) {
 }
 
 // Bulk Actions Helper Functions
+function gmDecodeAttr(str) {
+    // Decode HTML entities from data-generic attribute back to original string
+    const txt = document.createElement('textarea');
+    txt.innerHTML = str;
+    return txt.value;
+}
+
 function updateBulkDeleteButton() {
     const btn = document.getElementById('gmBulkDeleteBtn');
     if (!btn) return;
@@ -2019,7 +2027,7 @@ window.gmToggleSelectAll = function(source) {
 };
 
 window.gmOnRowSelect = function(cb) {
-    const generic = cb.getAttribute('data-generic');
+    const generic = gmDecodeAttr(cb.getAttribute('data-generic'));
     if (cb.checked) {
         gmSelectedItems.add(generic);
     } else {
