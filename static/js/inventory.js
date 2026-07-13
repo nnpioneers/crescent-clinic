@@ -39,7 +39,8 @@
                     </tr>`;
                 }).join('');
             } catch (e) { if (e.message) toast(e.message, 'error'); else toast('Operation failed', 'error'); }
-        }
+        }, 300);
+    }
 
         function toggleInventoryFields() {
             const cat = document.getElementById('invCat').value;
@@ -402,6 +403,7 @@
         // Expose functions to window object for script_app.js live reload routing
         window.loadInventory = loadInventory;
         window.deleteInventory = deleteInventory;
+        window.editMedModal = editMedModal;
 
 
 

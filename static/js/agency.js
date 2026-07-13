@@ -2193,8 +2193,8 @@ window.gmOpenEditModal = function(encodedBrand) {
         brand_name: brand.brand_name || '',
         is_without_brand: isWithoutBrand   // carry the flag into the save payload
     };
-    if (typeof editMedModal === 'function') {
-        editMedModal(item);
+    if (typeof window.editMedModal === 'function') {
+        window.editMedModal(item);
     } else {
         toast('Edit form is not available.', 'error');
     }
