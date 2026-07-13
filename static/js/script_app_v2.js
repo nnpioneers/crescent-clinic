@@ -1985,7 +1985,7 @@ window.onunhandledrejection = function(event) {
             // A row is valid if it has a name — qty may be 0 for newly created
             // "Without Brand" medicines where pricing/stock is filled in later.
             // Only skip rows that are completely empty (no name at all).
-            if (name) medicines.push({ name, qty: totalQty, unit_price, amount, batch_id });
+            if (name) medicines.push({ name, qty: totalQty, unit_price, amount, batch_id, tps });
         });
 
         let injCost = 0;

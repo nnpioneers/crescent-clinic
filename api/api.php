@@ -913,14 +913,24 @@ if (($uri === '/api/add_medicines' || $uri === '/api/direct_pharmacy') && $metho
             $name = $m['name'] ?? null;
             $qty = (int)($m['qty'] ?? 0);
             $batch_id = $m['batch_id'] ?? '';
+            $tps_input = max(1, (int)($m['tps'] ?? 1));
+            $unit_price_input = (float)($m['unit_price'] ?? 0);
             
             if ($name && $qty > 0) {
                 if ($batch_id) {
-                    $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, tablets_per_strip FROM inventory WHERE id=?");
+                    $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, tablets_per_strip, mrp, selling_price FROM inventory WHERE id=?");
                     $stmt->execute([$batch_id]);
                     $row = $stmt->fetch();
                     if ($row) {
                         $tps = max(1, (int)($row['tablets_per_strip'] ?? 1));
+                        
+                        if ((float)($row['mrp'] ?? 0) <= 0 || (float)($row['selling_price'] ?? 0) <= 0) {
+                            $new_mrp = $unit_price_input * $tps_input;
+                            $conn->prepare("UPDATE inventory SET mrp = ?, selling_price = ?, tablets_per_strip = ? WHERE id=?")
+                                 ->execute([$new_mrp, $new_mrp, $tps_input, $batch_id]);
+                            $tps = $tps_input;
+                        }
+                        
                         $cost_per_unit = (float)$row['purchase_price'] / $tps;
                         $total_cost += $cost_per_unit * $qty;
                         $stmt = $conn->prepare("UPDATE inventory SET stock = stock - ? WHERE id=?");
@@ -931,11 +941,19 @@ if (($uri === '/api/add_medicines' || $uri === '/api/direct_pharmacy') && $metho
                     }
                 } else {
                     ensure_synthesized_inventory($conn, $name);
-                    $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, tablets_per_strip, id FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
+                    $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, tablets_per_strip, id, mrp, selling_price FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
                     $stmt->execute([$name]);
                     $row = $stmt->fetch();
                     if ($row) {
                         $tps = max(1, (int)($row['tablets_per_strip'] ?? 1));
+                        
+                        if ((float)($row['mrp'] ?? 0) <= 0 || (float)($row['selling_price'] ?? 0) <= 0) {
+                            $new_mrp = $unit_price_input * $tps_input;
+                            $conn->prepare("UPDATE inventory SET mrp = ?, selling_price = ?, tablets_per_strip = ? WHERE id=?")
+                                 ->execute([$new_mrp, $new_mrp, $tps_input, $row['id']]);
+                            $tps = $tps_input;
+                        }
+                        
                         $cost_per_unit = (float)$row['purchase_price'] / $tps;
                         $total_cost += $cost_per_unit * $qty;
                         $stmt = $conn->prepare("UPDATE inventory SET stock = stock - ? WHERE id=?");
@@ -1068,28 +1086,46 @@ if ($uri === '/api/direct_sales/add' && $method === 'POST') {
             $qty      = (int)($m['qty'] ?? 0);
             $batch_id = $m['batch_id'] ?? '';
             $rev      = (float)($m['amount'] ?? 0);
+            $tps_input = max(1, (int)($m['tps'] ?? 1));
+            $unit_price_input = (float)($m['unit_price'] ?? 0);
             
             $m_cost = 0.0;
             $m['net_qty'] = $qty;
 
             if ($name && $qty > 0) {
                 if ($batch_id && (int)$batch_id > 0) {
-                    $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, tablets_per_strip FROM inventory WHERE id=?");
+                    $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, tablets_per_strip, mrp, selling_price FROM inventory WHERE id=?");
                     $stmt->execute([$batch_id]);
                     $row = $stmt->fetch();
                     if ($row) {
                         $tps = max(1, (int)($row['tablets_per_strip'] ?? 1));
+                        
+                        if ((float)($row['mrp'] ?? 0) <= 0 || (float)($row['selling_price'] ?? 0) <= 0) {
+                            $new_mrp = $unit_price_input * $tps_input;
+                            $conn->prepare("UPDATE inventory SET mrp = ?, selling_price = ?, tablets_per_strip = ? WHERE id=?")
+                                 ->execute([$new_mrp, $new_mrp, $tps_input, $batch_id]);
+                            $tps = $tps_input;
+                        }
+                        
                         $m_cost = ((float)$row['purchase_price'] / $tps) * $qty;
                         $conn->prepare("UPDATE inventory SET stock = stock - ? WHERE id=?")->execute([$qty, $batch_id]);
                         sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
                     }
                 } else {
                     ensure_synthesized_inventory($conn, $name);
-                    $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, tablets_per_strip, id FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
+                    $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, tablets_per_strip, id, mrp, selling_price FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
                     $stmt->execute([$name]);
                     $row = $stmt->fetch();
                     if ($row) {
                         $tps = max(1, (int)($row['tablets_per_strip'] ?? 1));
+                        
+                        if ((float)($row['mrp'] ?? 0) <= 0 || (float)($row['selling_price'] ?? 0) <= 0) {
+                            $new_mrp = $unit_price_input * $tps_input;
+                            $conn->prepare("UPDATE inventory SET mrp = ?, selling_price = ?, tablets_per_strip = ? WHERE id=?")
+                                 ->execute([$new_mrp, $new_mrp, $tps_input, $row['id']]);
+                            $tps = $tps_input;
+                        }
+                        
                         $m_cost = ((float)$row['purchase_price'] / $tps) * $qty;
                         $conn->prepare("UPDATE inventory SET stock = stock - ? WHERE id=?")->execute([$qty, $row['id']]);
                         sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
