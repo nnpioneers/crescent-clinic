@@ -1460,11 +1460,12 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
         $ai_generics = $stmt_ai->fetchAll(PDO::FETCH_COLUMN);
 
         // Merge, deduplicate (case-insensitive), preserve existing order
-        $existing_lower = array_map('strtolower', $gm_generics);
+        $existing_lower = array_map(function($val) { return strtolower($val ?? ''); }, $gm_generics);
         foreach ($ai_generics as $ag) {
-            if (!in_array(strtolower($ag), $existing_lower, true)) {
+            $ag_clean = strtolower($ag ?? '');
+            if (!in_array($ag_clean, $existing_lower, true)) {
                 $gm_generics[]      = $ag;
-                $existing_lower[]   = strtolower($ag);
+                $existing_lower[]   = $ag_clean;
             }
         }
     }
@@ -1536,10 +1537,15 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
         $generics_with_without_brand = [];
 
         foreach ($brand_batches as $r) {
-            if (strpos($r['batch_number'], 'ph_') === 0 || strtolower($r['brand_name']) === '(unmapped brand)' || strtolower($r['name']) === '(unmapped brand)' || strtolower($r['name']) === strtolower($r['generic_name']) || strpos(strtolower($r['name']), '(without brand)') !== false) {
-                $r['name'] = $r['generic_name'] . ' (Without Brand)';
+            $batchNum = $r['batch_number'] ?? '';
+            $brandName = $r['brand_name'] ?? '';
+            $nameVal = $r['name'] ?? '';
+            $genericName = $r['generic_name'] ?? '';
+            
+            if (strpos($batchNum, 'ph_') === 0 || strtolower($brandName) === '(unmapped brand)' || strtolower($nameVal) === '(unmapped brand)' || strtolower($nameVal) === strtolower($genericName) || strpos(strtolower($nameVal), '(without brand)') !== false) {
+                $r['name'] = $genericName . ' (Without Brand)';
                 $r['is_actual_without_brand'] = 1;
-                $generics_with_without_brand[strtolower($r['generic_name'])] = true;
+                $generics_with_without_brand[strtolower($genericName)] = true;
             } else {
                 $r['is_actual_without_brand'] = 0;
             }
