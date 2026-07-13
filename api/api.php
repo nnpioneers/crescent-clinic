@@ -144,9 +144,28 @@ function ensure_synthesized_inventory($conn, $name) {
     $stmt->execute([$name]);
     if (!$stmt->fetch()) {
         $gen_name = trim(str_replace(' (Without Brand)', '', $name));
-        $ph_batch = 'ph_' . substr(md5(uniqid()), 0, 8);
-        $stmt2 = $conn->prepare("INSERT IGNORE INTO inventory (name, generic_name, brand_name, stock, batch_number, category) VALUES (?, ?, '(Unmapped Brand)', 0, ?, 'Tablet')");
-        $stmt2->execute([$name, $gen_name, $ph_batch]);
+        
+        // Check if an '(Unmapped Brand)' default record already exists for this generic in inventory
+        $stmt_um = $conn->prepare("SELECT id, batch_number FROM inventory WHERE (name = '(Unmapped Brand)' OR name = '(unmapped brand)') AND TRIM(LOWER(generic_name)) = TRIM(LOWER(?)) LIMIT 1");
+        $stmt_um->execute([$gen_name]);
+        $row_um = $stmt_um->fetch();
+        
+        if ($row_um) {
+            $inv_id = $row_um['id'];
+            $batch_num = $row_um['batch_number'];
+            
+            // Rename the existing record in inventory
+            $conn->prepare("UPDATE inventory SET name = ? WHERE id = ?")->execute([$name, $inv_id]);
+            
+            // Rename the corresponding record in agency_items to keep them in sync
+            $conn->prepare("UPDATE agency_items SET item_name = ? WHERE (item_name = '(Unmapped Brand)' OR item_name = '(unmapped brand)') AND TRIM(LOWER(generic_name)) = TRIM(LOWER(?)) AND batch_number = ?")
+                 ->execute([$name, $gen_name, $batch_num]);
+        } else {
+            // Create a new record from scratch
+            $ph_batch = 'ph_' . substr(md5(uniqid()), 0, 8);
+            $stmt2 = $conn->prepare("INSERT IGNORE INTO inventory (name, generic_name, brand_name, stock, batch_number, category) VALUES (?, ?, '(Unmapped Brand)', 0, ?, 'Tablet')");
+            $stmt2->execute([$name, $gen_name, $ph_batch]);
+        }
     }
 }
 
