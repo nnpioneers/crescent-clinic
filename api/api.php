@@ -961,12 +961,24 @@ if (($uri === '/api/add_medicines' || $uri === '/api/direct_pharmacy') && $metho
                         
                         // Sync stock to agency inventory
                         sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
+                    } else {
+                        $batch = 'manual_default';
+                        $tps = $tps_input;
+                        $mrp = $unit_price_input * $tps_input;
+                        $cat = 'Medicine';
+                        $stmt_ins = $conn->prepare("INSERT INTO inventory (name, generic_name, mrp, selling_price, purchase_price, stock, category, batch_number, tablets_per_strip) VALUES (?, '', ?, ?, 0, ?, ?, ?, ?)");
+                        $stmt_ins->execute([trim($name), $mrp, $mrp, -$qty, $cat, $batch, $tps]);
+                        
+                        $stmt_ai = $conn->prepare("INSERT IGNORE INTO agency_items (item_name, generic_name, mrp, selling_price, purchase_price, stock, batch_number) VALUES (?, '', ?, ?, 0, ?, ?)");
+                        $stmt_ai->execute([trim($name), $mrp, $mrp, -$qty, $batch]);
+                        
+                        sync_stock_item($conn, trim($name), $batch, 'pharmacy');
                     }
                 }
             }
         }
 
-        $deduct_stock_by_name = function($item_name) use ($conn, &$total_cost) {
+        $deduct_stock_by_name = function($item_name, $category) use ($conn, &$total_cost) {
             if (!$item_name || trim($item_name) === '') return;
             ensure_synthesized_inventory($conn, $item_name);
             $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, id FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
@@ -979,14 +991,23 @@ if (($uri === '/api/add_medicines' || $uri === '/api/direct_pharmacy') && $metho
                 
                 // Sync stock to agency inventory
                 sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
+            } else {
+                $batch = 'manual_default';
+                $stmt_ins = $conn->prepare("INSERT INTO inventory (name, generic_name, mrp, selling_price, purchase_price, stock, category, batch_number, tablets_per_strip) VALUES (?, '', 0, 0, 0, -1, ?, ?, 1)");
+                $stmt_ins->execute([trim($item_name), $category, $batch]);
+                
+                $stmt_ai = $conn->prepare("INSERT IGNORE INTO agency_items (item_name, generic_name, mrp, selling_price, purchase_price, stock, batch_number) VALUES (?, '', 0, 0, 0, -1, ?)");
+                $stmt_ai->execute([trim($item_name), $batch]);
+                
+                sync_stock_item($conn, trim($item_name), $batch, 'pharmacy');
             }
         };
 
         if ($injection_cost > 0 && $injection_details) {
-            $deduct_stock_by_name($injection_details);
+            $deduct_stock_by_name($injection_details, 'Injection');
         }
         if ($iv_cost > 0 && $iv_details) {
-            $deduct_stock_by_name($iv_details);
+            $deduct_stock_by_name($iv_details, 'IV Fluids');
         }
         if ($upt_cost > 0) {
             $stmt = $conn->query("SELECT name, batch_number, purchase_price, id FROM inventory WHERE category='UPT Card' ORDER BY expiry_date ASC LIMIT 1");
@@ -1129,6 +1150,19 @@ if ($uri === '/api/direct_sales/add' && $method === 'POST') {
                         $m_cost = ((float)$row['purchase_price'] / $tps) * $qty;
                         $conn->prepare("UPDATE inventory SET stock = stock - ? WHERE id=?")->execute([$qty, $row['id']]);
                         sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
+                    } else {
+                        $batch = 'manual_default';
+                        $tps = $tps_input;
+                        $mrp = $unit_price_input * $tps_input;
+                        $cat = 'Medicine';
+                        $stmt_ins = $conn->prepare("INSERT INTO inventory (name, generic_name, mrp, selling_price, purchase_price, stock, category, batch_number, tablets_per_strip) VALUES (?, '', ?, ?, 0, ?, ?, ?, ?)");
+                        $stmt_ins->execute([trim($name), $mrp, $mrp, -$qty, $cat, $batch, $tps]);
+                        
+                        $stmt_ai = $conn->prepare("INSERT IGNORE INTO agency_items (item_name, generic_name, mrp, selling_price, purchase_price, stock, batch_number) VALUES (?, '', ?, ?, 0, ?, ?)");
+                        $stmt_ai->execute([trim($name), $mrp, $mrp, -$qty, $batch]);
+                        
+                        sync_stock_item($conn, trim($name), $batch, 'pharmacy');
+                        $m_cost = 0;
                     }
                 }
             }
@@ -1140,7 +1174,7 @@ if ($uri === '/api/direct_sales/add' && $method === 'POST') {
         }
         unset($m);
 
-        $deduct_single = function($item_name) use ($conn, &$total_cost) {
+        $deduct_single = function($item_name, $category) use ($conn, &$total_cost) {
             if (!$item_name || trim($item_name) === '') return;
             ensure_synthesized_inventory($conn, $item_name);
             $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, id FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
@@ -1150,11 +1184,20 @@ if ($uri === '/api/direct_sales/add' && $method === 'POST') {
                 $total_cost += (float)$row['purchase_price'];
                 $conn->prepare("UPDATE inventory SET stock = stock - 1 WHERE id=?")->execute([$row['id']]);
                 sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
+            } else {
+                $batch = 'manual_default';
+                $stmt_ins = $conn->prepare("INSERT INTO inventory (name, generic_name, mrp, selling_price, purchase_price, stock, category, batch_number, tablets_per_strip) VALUES (?, '', 0, 0, 0, -1, ?, ?, 1)");
+                $stmt_ins->execute([trim($item_name), $category, $batch]);
+                
+                $stmt_ai = $conn->prepare("INSERT IGNORE INTO agency_items (item_name, generic_name, mrp, selling_price, purchase_price, stock, batch_number) VALUES (?, '', 0, 0, 0, -1, ?)");
+                $stmt_ai->execute([trim($item_name), $batch]);
+                
+                sync_stock_item($conn, trim($item_name), $batch, 'pharmacy');
             }
         };
 
-        if ($injection_cost > 0 && $injection_details) $deduct_single($injection_details);
-        if ($iv_cost > 0 && $iv_details)                 $deduct_single($iv_details);
+        if ($injection_cost > 0 && $injection_details) $deduct_single($injection_details, 'Injection');
+        if ($iv_cost > 0 && $iv_details)                 $deduct_single($iv_details, 'IV Fluids');
         if ($upt_cost > 0) {
             $stmt = $conn->query("SELECT name, batch_number, purchase_price, id FROM inventory WHERE category='UPT Card' ORDER BY expiry_date ASC LIMIT 1");
             $row  = $stmt->fetch();
