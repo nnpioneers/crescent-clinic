@@ -965,14 +965,18 @@ if (($uri === '/api/add_medicines' || $uri === '/api/direct_pharmacy') && $metho
                         $batch = 'manual_default';
                         $tps = $tps_input;
                         $mrp = $unit_price_input * $tps_input;
-                        $cat = 'Medicine';
+                        $cat = 'Tablet';
+                        $new_name = trim($name);
+                        if (stripos($new_name, '(Without Brand)') === false) {
+                            $new_name .= ' (Without Brand)';
+                        }
                         $stmt_ins = $conn->prepare("INSERT INTO inventory (name, generic_name, mrp, selling_price, purchase_price, stock, category, batch_number, tablets_per_strip) VALUES (?, '', ?, ?, 0, ?, ?, ?, ?)");
-                        $stmt_ins->execute([trim($name), $mrp, $mrp, -$qty, $cat, $batch, $tps]);
+                        $stmt_ins->execute([$new_name, $mrp, $mrp, -$qty, $cat, $batch, $tps]);
                         
                         $stmt_ai = $conn->prepare("INSERT IGNORE INTO agency_items (item_name, generic_name, mrp, selling_price, purchase_price, stock, batch_number) VALUES (?, '', ?, ?, 0, ?, ?)");
-                        $stmt_ai->execute([trim($name), $mrp, $mrp, -$qty, $batch]);
+                        $stmt_ai->execute([$new_name, $mrp, $mrp, -$qty, $batch]);
                         
-                        sync_stock_item($conn, trim($name), $batch, 'pharmacy');
+                        sync_stock_item($conn, $new_name, $batch, 'pharmacy');
                     }
                 }
             }
@@ -993,13 +997,17 @@ if (($uri === '/api/add_medicines' || $uri === '/api/direct_pharmacy') && $metho
                 sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
             } else {
                 $batch = 'manual_default';
+                $new_item_name = trim($item_name);
+                if (stripos($new_item_name, '(Without Brand)') === false) {
+                    $new_item_name .= ' (Without Brand)';
+                }
                 $stmt_ins = $conn->prepare("INSERT INTO inventory (name, generic_name, mrp, selling_price, purchase_price, stock, category, batch_number, tablets_per_strip) VALUES (?, '', 0, 0, 0, -1, ?, ?, 1)");
-                $stmt_ins->execute([trim($item_name), $category, $batch]);
+                $stmt_ins->execute([$new_item_name, $category, $batch]);
                 
                 $stmt_ai = $conn->prepare("INSERT IGNORE INTO agency_items (item_name, generic_name, mrp, selling_price, purchase_price, stock, batch_number) VALUES (?, '', 0, 0, 0, -1, ?)");
-                $stmt_ai->execute([trim($item_name), $batch]);
+                $stmt_ai->execute([$new_item_name, $batch]);
                 
-                sync_stock_item($conn, trim($item_name), $batch, 'pharmacy');
+                sync_stock_item($conn, $new_item_name, $batch, 'pharmacy');
             }
         };
 
@@ -1154,14 +1162,18 @@ if ($uri === '/api/direct_sales/add' && $method === 'POST') {
                         $batch = 'manual_default';
                         $tps = $tps_input;
                         $mrp = $unit_price_input * $tps_input;
-                        $cat = 'Medicine';
+                        $cat = 'Tablet';
+                        $new_name = trim($name);
+                        if (stripos($new_name, '(Without Brand)') === false) {
+                            $new_name .= ' (Without Brand)';
+                        }
                         $stmt_ins = $conn->prepare("INSERT INTO inventory (name, generic_name, mrp, selling_price, purchase_price, stock, category, batch_number, tablets_per_strip) VALUES (?, '', ?, ?, 0, ?, ?, ?, ?)");
-                        $stmt_ins->execute([trim($name), $mrp, $mrp, -$qty, $cat, $batch, $tps]);
+                        $stmt_ins->execute([$new_name, $mrp, $mrp, -$qty, $cat, $batch, $tps]);
                         
                         $stmt_ai = $conn->prepare("INSERT IGNORE INTO agency_items (item_name, generic_name, mrp, selling_price, purchase_price, stock, batch_number) VALUES (?, '', ?, ?, 0, ?, ?)");
-                        $stmt_ai->execute([trim($name), $mrp, $mrp, -$qty, $batch]);
+                        $stmt_ai->execute([$new_name, $mrp, $mrp, -$qty, $batch]);
                         
-                        sync_stock_item($conn, trim($name), $batch, 'pharmacy');
+                        sync_stock_item($conn, $new_name, $batch, 'pharmacy');
                         $m_cost = 0;
                     }
                 }
@@ -1186,13 +1198,17 @@ if ($uri === '/api/direct_sales/add' && $method === 'POST') {
                 sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
             } else {
                 $batch = 'manual_default';
+                $new_item_name = trim($item_name);
+                if (stripos($new_item_name, '(Without Brand)') === false) {
+                    $new_item_name .= ' (Without Brand)';
+                }
                 $stmt_ins = $conn->prepare("INSERT INTO inventory (name, generic_name, mrp, selling_price, purchase_price, stock, category, batch_number, tablets_per_strip) VALUES (?, '', 0, 0, 0, -1, ?, ?, 1)");
-                $stmt_ins->execute([trim($item_name), $category, $batch]);
+                $stmt_ins->execute([$new_item_name, $category, $batch]);
                 
                 $stmt_ai = $conn->prepare("INSERT IGNORE INTO agency_items (item_name, generic_name, mrp, selling_price, purchase_price, stock, batch_number) VALUES (?, '', 0, 0, 0, -1, ?)");
-                $stmt_ai->execute([trim($item_name), $batch]);
+                $stmt_ai->execute([$new_item_name, $batch]);
                 
-                sync_stock_item($conn, trim($item_name), $batch, 'pharmacy');
+                sync_stock_item($conn, $new_item_name, $batch, 'pharmacy');
             }
         };
 
