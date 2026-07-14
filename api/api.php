@@ -2186,9 +2186,16 @@ if ($uri === '/api/inventory/auto_create_brand' && $method === 'POST') {
         // Use a consistent batch number so sync_generic_mappings merges them into 1 row
         $batch = 'manual_default';
         
+        // Fetch category of the generic medicine to inherit it
+        $cat_stmt = $conn->prepare("SELECT category FROM inventory WHERE (TRIM(LOWER(name)) = TRIM(LOWER(?)) OR TRIM(LOWER(name)) = TRIM(LOWER(?))) AND category IS NOT NULL LIMIT 1");
+        $cat_stmt->execute([$generic_name, $generic_name . ' (without brand)']);
+        $cat_row = $cat_stmt->fetch();
+        $inherited_cat = $cat_row ? $cat_row['category'] : 'Tablet';
+        $cat_stmt->closeCursor();
+        
         // 1. Insert into inventory (0 stock, but available for sale)
-        $stmt = $conn->prepare("INSERT IGNORE INTO inventory (name, generic_name, mrp, selling_price, purchase_price, stock, category, batch_number) VALUES (?, ?, ?, ?, ?, 0, 'TAB', ?)");
-        $stmt->execute([$brand_name, $generic_name, $unit_price, $unit_price, 0, $batch]);
+        $stmt = $conn->prepare("INSERT IGNORE INTO inventory (name, generic_name, mrp, selling_price, purchase_price, stock, category, batch_number) VALUES (?, ?, ?, ?, ?, 0, ?, ?)");
+        $stmt->execute([$brand_name, $generic_name, $unit_price, $unit_price, 0, $inherited_cat, $batch]);
         
         // 2. Insert into agency_items
         $stmt2 = $conn->prepare("INSERT IGNORE INTO agency_items (item_name, generic_name, mrp, selling_price, purchase_price, stock, batch_number) VALUES (?, ?, ?, ?, ?, 0, ?)");
