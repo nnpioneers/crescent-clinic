@@ -983,13 +983,17 @@ if (($uri === '/api/add_medicines' || $uri === '/api/direct_pharmacy') && $metho
             }
         }
 
-        $deduct_stock_by_name = function($item_name, $category) use ($conn, &$total_cost) {
+        $deduct_stock_by_name = function($item_name, $category, $cost = 0) use ($conn, &$total_cost) {
             if (!$item_name || trim($item_name) === '') return;
+            if (trim($category) === 'Injection') $category = 'INJ';
             ensure_synthesized_inventory($conn, $item_name);
-            $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, id FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
+            $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, id, mrp, selling_price FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
             $stmt->execute([trim($item_name)]);
             $row = $stmt->fetch();
             if ($row) {
+                if ($cost > 0 && ((float)$row['mrp'] <= 0 || (float)$row['selling_price'] <= 0)) {
+                    $conn->prepare("UPDATE inventory SET mrp=?, selling_price=? WHERE id=?")->execute([$cost, $cost, $row['id']]);
+                }
                 $total_cost += (float)$row['purchase_price'];
                 $stmt = $conn->prepare("UPDATE inventory SET stock = stock - 1 WHERE id=?");
                 $stmt->execute([$row['id']]);
@@ -1003,21 +1007,22 @@ if (($uri === '/api/add_medicines' || $uri === '/api/direct_pharmacy') && $metho
                     $new_item_name .= ' (Without Brand)';
                 }
                 $orig_item_name = trim($item_name);
-                $stmt_ins = $conn->prepare("INSERT INTO inventory (name, generic_name, mrp, selling_price, purchase_price, stock, category, batch_number, tablets_per_strip) VALUES (?, ?, 0, 0, 0, -1, ?, ?, 1)");
-                $stmt_ins->execute([$new_item_name, $orig_item_name, $category, $batch]);
+                $mrp = $cost > 0 ? $cost : 0;
+                $stmt_ins = $conn->prepare("INSERT INTO inventory (name, generic_name, mrp, selling_price, purchase_price, stock, category, batch_number, tablets_per_strip) VALUES (?, ?, ?, ?, 0, -1, ?, ?, 1)");
+                $stmt_ins->execute([$new_item_name, $orig_item_name, $mrp, $mrp, $category, $batch]);
                 
-                $stmt_ai = $conn->prepare("INSERT IGNORE INTO agency_items (item_name, generic_name, mrp, selling_price, purchase_price, stock, batch_number) VALUES (?, ?, 0, 0, 0, -1, ?)");
-                $stmt_ai->execute([$new_item_name, $orig_item_name, $batch]);
+                $stmt_ai = $conn->prepare("INSERT IGNORE INTO agency_items (item_name, generic_name, mrp, selling_price, purchase_price, stock, batch_number) VALUES (?, ?, ?, ?, 0, -1, ?)");
+                $stmt_ai->execute([$new_item_name, $orig_item_name, $mrp, $mrp, $batch]);
                 
                 sync_stock_item($conn, $new_item_name, $batch, 'pharmacy');
             }
         };
 
         if ($injection_cost > 0 && $injection_details) {
-            $deduct_stock_by_name($injection_details, 'Injection');
+            $deduct_stock_by_name($injection_details, 'INJ', $injection_cost);
         }
         if ($iv_cost > 0 && $iv_details) {
-            $deduct_stock_by_name($iv_details, 'IV Fluids');
+            $deduct_stock_by_name($iv_details, 'IV Fluids', $iv_cost);
         }
         if ($upt_cost > 0) {
             $stmt = $conn->query("SELECT name, batch_number, purchase_price, id FROM inventory WHERE category='UPT Card' ORDER BY expiry_date ASC LIMIT 1");
@@ -1189,13 +1194,17 @@ if ($uri === '/api/direct_sales/add' && $method === 'POST') {
         }
         unset($m);
 
-        $deduct_single = function($item_name, $category) use ($conn, &$total_cost) {
+        $deduct_single = function($item_name, $category, $cost = 0) use ($conn, &$total_cost) {
             if (!$item_name || trim($item_name) === '') return;
+            if (trim($category) === 'Injection') $category = 'INJ';
             ensure_synthesized_inventory($conn, $item_name);
-            $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, id FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
+            $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, id, mrp, selling_price FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
             $stmt->execute([trim($item_name)]);
             $row = $stmt->fetch();
             if ($row) {
+                if ($cost > 0 && ((float)$row['mrp'] <= 0 || (float)$row['selling_price'] <= 0)) {
+                    $conn->prepare("UPDATE inventory SET mrp=?, selling_price=? WHERE id=?")->execute([$cost, $cost, $row['id']]);
+                }
                 $total_cost += (float)$row['purchase_price'];
                 $conn->prepare("UPDATE inventory SET stock = stock - 1 WHERE id=?")->execute([$row['id']]);
                 sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
@@ -1206,18 +1215,19 @@ if ($uri === '/api/direct_sales/add' && $method === 'POST') {
                     $new_item_name .= ' (Without Brand)';
                 }
                 $orig_item_name = trim($item_name);
-                $stmt_ins = $conn->prepare("INSERT INTO inventory (name, generic_name, mrp, selling_price, purchase_price, stock, category, batch_number, tablets_per_strip) VALUES (?, ?, 0, 0, 0, -1, ?, ?, 1)");
-                $stmt_ins->execute([$new_item_name, $orig_item_name, $category, $batch]);
+                $mrp = $cost > 0 ? $cost : 0;
+                $stmt_ins = $conn->prepare("INSERT INTO inventory (name, generic_name, mrp, selling_price, purchase_price, stock, category, batch_number, tablets_per_strip) VALUES (?, ?, ?, ?, 0, -1, ?, ?, 1)");
+                $stmt_ins->execute([$new_item_name, $orig_item_name, $mrp, $mrp, $category, $batch]);
                 
-                $stmt_ai = $conn->prepare("INSERT IGNORE INTO agency_items (item_name, generic_name, mrp, selling_price, purchase_price, stock, batch_number) VALUES (?, ?, 0, 0, 0, -1, ?)");
-                $stmt_ai->execute([$new_item_name, $orig_item_name, $batch]);
+                $stmt_ai = $conn->prepare("INSERT IGNORE INTO agency_items (item_name, generic_name, mrp, selling_price, purchase_price, stock, batch_number) VALUES (?, ?, ?, ?, 0, -1, ?)");
+                $stmt_ai->execute([$new_item_name, $orig_item_name, $mrp, $mrp, $batch]);
                 
                 sync_stock_item($conn, $new_item_name, $batch, 'pharmacy');
             }
         };
 
-        if ($injection_cost > 0 && $injection_details) $deduct_single($injection_details, 'Injection');
-        if ($iv_cost > 0 && $iv_details)                 $deduct_single($iv_details, 'IV Fluids');
+        if ($injection_cost > 0 && $injection_details) $deduct_single($injection_details, 'INJ', $injection_cost);
+        if ($iv_cost > 0 && $iv_details)                 $deduct_single($iv_details, 'IV Fluids', $iv_cost);
         if ($upt_cost > 0) {
             $stmt = $conn->query("SELECT name, batch_number, purchase_price, id FROM inventory WHERE category='UPT Card' ORDER BY expiry_date ASC LIMIT 1");
             $row  = $stmt->fetch();
@@ -1873,38 +1883,49 @@ if ($uri === '/api/inventory/add' && $method === 'POST') {
     json_response(['success' => true]);
 }
 
-function backfill_historical_medicine_cost($conn, $med_name, $unit_cost) {
+function backfill_historical_medicine_cost($conn, $med_name, $unit_cost, $old_unit_cost = 0) {
     if ($unit_cost < 0) return;
+    if (abs($unit_cost - $old_unit_cost) < 0.01) return; // No change
     
     $med_name_safe = addslashes($med_name);
+    $cost_diff_per_unit = $unit_cost - $old_unit_cost;
     
     $tables = ['direct_sales', 'prescriptions'];
     foreach ($tables as $table) {
-        $stmt = $conn->query("SELECT id, medicines, cost_amount, total_amount FROM {$table} WHERE medicines LIKE '%" . $med_name_safe . "%'");
+        $stmt = $conn->query("SELECT id, medicines, injection_details, iv_details, cost_amount, total_amount FROM {$table} WHERE medicines LIKE '%" . $med_name_safe . "%' OR injection_details LIKE '%" . $med_name_safe . "%' OR iv_details LIKE '%" . $med_name_safe . "%'");
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $meds = json_decode($row['medicines'], true) ?: [];
-            $changed = false;
-            $new_cost_amount = 0;
+            $changed_meds = false;
+            $qty_difference = 0;
             
+            // Check in medicines JSON
             foreach ($meds as &$m) {
                 if (trim(strtolower($m['name'] ?? '')) === trim(strtolower($med_name))) {
-                    // Always recalculate cost using the new unit price (not just when cost==0)
                     $total_qty = (int)($m['qty'] ?? 0);
                     $returned_qty = (int)($m['returned_qty'] ?? 0);
                     $net_qty = $total_qty - $returned_qty;
                     if ($net_qty > 0 || $total_qty > 0) {
+                        $qty_difference += $total_qty;
                         $new_cost = $unit_cost * $total_qty;
-                        if ((float)($m['cost'] ?? 0) !== $new_cost) {
-                            $m['cost'] = $new_cost;
-                            $m['profit'] = (float)($m['revenue'] ?? 0) - $new_cost;
-                            $changed = true;
-                        }
+                        $m['cost'] = $new_cost;
+                        $m['profit'] = (float)($m['revenue'] ?? 0) - $new_cost;
+                        $changed_meds = true;
                     }
                 }
-                $new_cost_amount += (float)($m['cost'] ?? 0);
             }
             
-            if ($changed) {
+            // Check in injection_details
+            if (trim(strtolower($row['injection_details'] ?? '')) === trim(strtolower($med_name))) {
+                $qty_difference += 1; // Injection is 1 unit
+            }
+            
+            // Check in iv_details
+            if (trim(strtolower($row['iv_details'] ?? '')) === trim(strtolower($med_name))) {
+                $qty_difference += 1; // IV is 1 unit
+            }
+            
+            if ($qty_difference > 0 || $changed_meds) {
+                $new_cost_amount = (float)($row['cost_amount'] ?? 0) + ($cost_diff_per_unit * $qty_difference);
                 $upd = $conn->prepare("UPDATE {$table} SET medicines=?, cost_amount=? WHERE id=?");
                 $upd->execute([json_encode($meds), $new_cost_amount, $row['id']]);
             }
@@ -1929,7 +1950,7 @@ if ($uri === '/api/inventory/update' && $method === 'POST') {
     $is_without_brand = !empty($input['is_without_brand']);
 
     // Always verify server-side: fetch the original record
-    $orig_stmt = $conn->prepare("SELECT name, batch_number, generic_name FROM inventory WHERE id = ?");
+    $orig_stmt = $conn->prepare("SELECT name, batch_number, generic_name, purchase_price, tablets_per_strip FROM inventory WHERE id = ?");
     $orig_stmt->execute([$id]);
     $orig = $orig_stmt->fetch(PDO::FETCH_ASSOC);
     $orig_name  = $orig['name']  ?? '';
@@ -2019,7 +2040,9 @@ if ($uri === '/api/inventory/update' && $method === 'POST') {
 
         // Backfill historical zero-cost sales
         $actual_unit_cost = ((int)$tablets_per_strip > 0) ? ((float)$purchase_price / (int)$tablets_per_strip) : (float)$purchase_price;
-        backfill_historical_medicine_cost($conn, $name, $actual_unit_cost);
+        $old_tps = (int)($orig['tablets_per_strip'] ?? 1);
+        $old_unit_cost = ($old_tps > 0) ? ((float)($orig['purchase_price'] ?? 0) / $old_tps) : (float)($orig['purchase_price'] ?? 0);
+        backfill_historical_medicine_cost($conn, $name, $actual_unit_cost, $old_unit_cost);
 
         json_response(['success' => true]);
     }
@@ -2140,7 +2163,9 @@ if ($uri === '/api/inventory/update' && $method === 'POST') {
 
     // Backfill historical zero-cost sales
     $actual_unit_cost = ((int)$tablets_per_strip > 0) ? ((float)$purchase_price / (int)$tablets_per_strip) : (float)$purchase_price;
-    backfill_historical_medicine_cost($conn, $name, $actual_unit_cost);
+    $old_tps = (int)($orig['tablets_per_strip'] ?? 1);
+    $old_unit_cost = ($old_tps > 0) ? ((float)($orig['purchase_price'] ?? 0) / $old_tps) : (float)($orig['purchase_price'] ?? 0);
+    backfill_historical_medicine_cost($conn, $name, $actual_unit_cost, $old_unit_cost);
 
     json_response(['success' => true]);
 }
