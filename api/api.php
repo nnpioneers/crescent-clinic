@@ -1429,6 +1429,37 @@ if ($uri === '/api/direct_sales/list' && $method === 'GET') {
         $params[] = $date_to;
     }
 
+    // Fetch average purchase costs and tablets_per_strip from inventory
+    $inv_stmt = $conn->query("SELECT name, MAX(tablets_per_strip) as tablets_per_strip, MAX(purchase_price) as max_cost FROM inventory GROUP BY name");
+    $inv_costs = [];
+    $inv_tps = [];
+    foreach ($inv_stmt->fetchAll() as $row) {
+        $name = str_replace("\xEF\xBB\xBF", "", $row['name']);
+        $name = str_replace("\ufeff", "", $name);
+        $name = str_replace("\u200b", "", $name);
+        // Direct byte order stripping just in case
+        $name = str_replace("\xef\xbb\xbf", "", $name);
+        $name = str_replace(chr(0xEF).chr(0xBB).chr(0xBF), "", $name);
+        $norm_name = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($name)));
+        
+        $cost = (float)$row['max_cost'];
+        $inv_costs[$name] = $cost;
+        $inv_tps[$name] = (int)$row['tablets_per_strip'];
+        if (!isset($inv_costs[$norm_name]) || $cost > $inv_costs[$norm_name]) {
+            $inv_costs[$norm_name] = $cost;
+            $inv_tps[$norm_name] = (int)$row['tablets_per_strip'];
+        }
+    }
+
+    $inv_batch_stmt = $conn->query("SELECT id, purchase_price, tablets_per_strip FROM inventory");
+    $inv_batches = [];
+    foreach ($inv_batch_stmt->fetchAll() as $row) {
+        $inv_batches[$row['id']] = [
+            'purchase_price' => (float)$row['purchase_price'],
+            'tablets_per_strip' => (int)$row['tablets_per_strip']
+        ];
+    }
+
     $stmt = $conn->prepare("SELECT * FROM direct_sales $where ORDER BY created_at DESC");
     $stmt->execute($params);
     $rows = $stmt->fetchAll();
@@ -1440,8 +1471,25 @@ if ($uri === '/api/direct_sales/list' && $method === 'GET') {
             $net_qty = $qty - $ret;
             
             $base_cost = (float)($m['cost'] ?? 0);
-            $unit_cost = $qty > 0 ? ($base_cost / $qty) : 0;
-            $net_cost = $net_qty * $unit_cost;
+            if ($base_cost <= 0) {
+                // Fall back to live cost from inventory
+                $name = $m['name'] ?? '';
+                $batch_id = $m['batch_id'] ?? null;
+                if ($batch_id && isset($inv_batches[$batch_id])) {
+                    $unit_cost = $inv_batches[$batch_id]['purchase_price'];
+                    $tps = max(1, (int)$inv_batches[$batch_id]['tablets_per_strip']);
+                } else {
+                    $name_clean = str_replace(chr(0xEF).chr(0xBB).chr(0xBF), "", $name);
+                    $norm_m_name = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($name_clean)));
+                    $unit_cost = $inv_costs[$name] ?? $inv_costs[$norm_m_name] ?? 0;
+                    $tps = max(1, (int)($inv_tps[$name] ?? $inv_tps[$norm_m_name] ?? 1));
+                }
+                $actual_unit_cost = $unit_cost / $tps;
+                $net_cost = $net_qty * $actual_unit_cost;
+            } else {
+                $unit_cost = $qty > 0 ? ($base_cost / $qty) : 0;
+                $net_cost = $net_qty * $unit_cost;
+            }
 
             $m['net_qty'] = $net_qty;
             $m['cost'] = $net_cost; // Update cost to reflect net quantity
@@ -2883,7 +2931,9 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
 
         if ($row['injection_details']) {
             $name = trim($row['injection_details']);
-            $cost = $inv_costs[$name] ?? 0;
+            $name = str_replace(chr(0xEF).chr(0xBB).chr(0xBF), "", $name);
+            $norm_name = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($name)));
+            $cost = $inv_costs[$name] ?? $inv_costs[$norm_name] ?? 0;
             $inj_cost_calc += $cost;
             $rev = (float)$row['injection_cost'];
             
@@ -2907,7 +2957,9 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
         }
         if ($row['iv_details']) {
             $name = trim($row['iv_details']);
-            $cost = $inv_costs[$name] ?? 0;
+            $name = str_replace(chr(0xEF).chr(0xBB).chr(0xBF), "", $name);
+            $norm_name = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($name)));
+            $cost = $inv_costs[$name] ?? $inv_costs[$norm_name] ?? 0;
             $iv_cost_calc += $cost;
             $rev = (float)$row['iv_cost'];
             
