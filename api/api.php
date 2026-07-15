@@ -1513,22 +1513,22 @@ if ($uri === '/api/direct_sales/list' && $method === 'GET') {
             $ret = (float)($m['returned_qty'] ?? 0);
             $net_qty = $qty - $ret;
             
-            $base_cost = (float)($m['cost'] ?? 0);
-            if ($base_cost <= 0) {
-                // Fall back to live cost from inventory
-                $name = $m['name'] ?? '';
-                $batch_id = $m['batch_id'] ?? null;
-                if ($batch_id && isset($inv_batches[$batch_id])) {
-                    $unit_cost = $inv_batches[$batch_id]['purchase_price'];
-                    $tps = max(1, (int)$inv_batches[$batch_id]['tablets_per_strip']);
-                } else {
-                    $norm_m_name = normalize_medicine_name($name);
-                    $unit_cost = $inv_costs[$name] ?? $inv_costs[$norm_m_name] ?? 0;
-                    $tps = max(1, (int)($inv_tps[$name] ?? $inv_tps[$norm_m_name] ?? 1));
-                }
-                $actual_unit_cost = $unit_cost / $tps;
-                $net_cost = $net_qty * $actual_unit_cost;
+            $name = $m['name'] ?? '';
+            $batch_id = $m['batch_id'] ?? null;
+            $live_unit_cost = 0.0;
+            if ($batch_id && isset($inv_batches[$batch_id])) {
+                $live_unit_cost = (float)$inv_batches[$batch_id]['purchase_price'] / max(1, (int)$inv_batches[$batch_id]['tablets_per_strip']);
             } else {
+                $norm_m_name = normalize_medicine_name($name);
+                $unit_cost = $inv_costs[$name] ?? $inv_costs[$norm_m_name] ?? 0;
+                $tps = max(1, (int)($inv_tps[$name] ?? $inv_tps[$norm_m_name] ?? 1));
+                $live_unit_cost = $unit_cost / $tps;
+            }
+
+            if ($live_unit_cost > 0) {
+                $net_cost = $net_qty * $live_unit_cost;
+            } else {
+                $base_cost = (float)($m['cost'] ?? 0);
                 $unit_cost = $qty > 0 ? ($base_cost / $qty) : 0;
                 $net_cost = $net_qty * $unit_cost;
             }
@@ -3049,21 +3049,21 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
             $amt = (float)($m['amount'] ?? 0) - (float)($m['returned_amount'] ?? 0);
             
             $batch_id = $m['batch_id'] ?? null;
-            if (isset($m['cost']) && (float)$m['cost'] > 0) {
-                // Prefer the saved historical cost (updated via backfill)
-                $saved_total_cost = (float)$m['cost'];
-                $total_cost = ($p_qty > 0) ? ($saved_total_cost / $p_qty) * $qty : 0;
+            $live_unit_cost = 0.0;
+            if ($batch_id && isset($inv_batches[$batch_id])) {
+                $live_unit_cost = (float)$inv_batches[$batch_id]['purchase_price'] / max(1, (int)$inv_batches[$batch_id]['tablets_per_strip']);
             } else {
-                if ($batch_id && isset($inv_batches[$batch_id])) {
-                    $unit_cost = $inv_batches[$batch_id]['purchase_price'];
-                    $tps = max(1, (int)$inv_batches[$batch_id]['tablets_per_strip']);
-                } else {
-                    $norm_m_name = normalize_medicine_name($name);
-                    $unit_cost = $inv_costs[$name] ?? $inv_costs[$norm_m_name] ?? 0;
-                    $tps = max(1, (int)($inv_tps[$name] ?? $inv_tps[$norm_m_name] ?? 1));
-                }
-                $actual_unit_cost = $unit_cost / $tps;
-                $total_cost = $actual_unit_cost * $qty;
+                $norm_m_name = normalize_medicine_name($name);
+                $unit_cost = $inv_costs[$name] ?? $inv_costs[$norm_m_name] ?? 0;
+                $tps = max(1, (int)($inv_tps[$name] ?? $inv_tps[$norm_m_name] ?? 1));
+                $live_unit_cost = $unit_cost / $tps;
+            }
+
+            if ($live_unit_cost > 0) {
+                $total_cost = $live_unit_cost * $qty;
+            } else {
+                $saved_total_cost = (float)($m['cost'] ?? 0);
+                $total_cost = ($p_qty > 0) ? ($saved_total_cost / $p_qty) * $qty : 0;
             }
             $profit = $amt - $total_cost;
 
