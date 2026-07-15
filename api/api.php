@@ -1297,7 +1297,7 @@ if ($uri === '/api/direct_sales/add' && $method === 'POST') {
             $customer_name, $mobile_number, json_encode($medicines),
             $injection_details ?: null, $iv_details ?: null,
             $injection_cost, $iv_cost, $upt_card, $upt_cost,
-            $total_med_amount, $discount_percent,
+            ($total_med_amount + $injection_cost + $iv_cost + $upt_cost), $discount_percent,
             $cash_amount, $gpay_amount, $phonepe_amount, $paid_amount, $balance_amount, $total_cost, $status, $payment_history_json, $upi_account
         ]);
         $sale_id = $conn->lastInsertId();
@@ -1694,8 +1694,11 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
         $stmt_brands = $conn->prepare($brand_query);
         $stmt_brands->execute($brand_params);
         $brand_batches = $stmt_brands->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+        $brand_batches = [];
+    }
         
-        // Merge direct inventory matches (from $results) so searching by Brand Name works
+    // Merge direct inventory matches (from $results) so searching by Brand Name works
         $seen_ids = [];
         foreach ($brand_batches as $bb) {
             $seen_ids[$bb['id']] = true;
@@ -1813,7 +1816,6 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
             }
         }
         // ─────────────────────────────────────────────────────────────────────────
-    }
 
     usort($final_results, function($a, $b) {
         $gen_cmp = strcmp(strtolower($a['generic_name'] ?? ''), strtolower($b['generic_name'] ?? ''));
@@ -1932,7 +1934,13 @@ function backfill_historical_medicine_cost($conn, $med_name, $unit_cost, $old_un
     if ($unit_cost < 0) return;
     if (abs($unit_cost - $old_unit_cost) < 0.01) return; // No change
     
-    $med_name_norm = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($med_name)));
+    // Clean name of BOM and Without Brand suffix
+    $clean_name = function($str) {
+        $str = str_replace("\xEF\xBB\xBF", "", $str);
+        return trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($str)));
+    };
+    
+    $med_name_norm = $clean_name($med_name);
     $med_name_safe = addslashes($med_name_norm);
     $cost_diff_per_unit = $unit_cost - $old_unit_cost;
     
@@ -1942,40 +1950,45 @@ function backfill_historical_medicine_cost($conn, $med_name, $unit_cost, $old_un
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $meds = json_decode($row['medicines'], true) ?: [];
             $changed_meds = false;
-            $qty_difference = 0;
+            $med_cost_diff = 0.0;
             
             // Check in medicines JSON
             foreach ($meds as &$m) {
-                $m_name_norm = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($m['name'] ?? '')));
-                $med_name_norm = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($med_name)));
+                $m_name_norm = $clean_name($m['name'] ?? '');
                 if ($m_name_norm === $med_name_norm && $m_name_norm !== '') {
                     $total_qty = (int)($m['qty'] ?? 0);
                     $returned_qty = (int)($m['returned_qty'] ?? 0);
                     $net_qty = $total_qty - $returned_qty;
                     if ($net_qty > 0 || $total_qty > 0) {
-                        $qty_difference += $total_qty;
+                        $old_m_cost = (float)($m['cost'] ?? 0);
                         $new_cost = $unit_cost * $total_qty;
                         $m['cost'] = $new_cost;
                         $m['profit'] = (float)($m['revenue'] ?? $m['amount'] ?? 0) - $new_cost;
+                        $med_cost_diff += ($new_cost - $old_m_cost);
                         $changed_meds = true;
                     }
                 }
             }
+            unset($m);
             
+            $non_med_qty = 0;
             // Check in injection_details
-            $inj_name_norm = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($row['injection_details'] ?? '')));
+            $inj_name_norm = $clean_name($row['injection_details'] ?? '');
             if ($inj_name_norm === $med_name_norm && $inj_name_norm !== '') {
-                $qty_difference += 1; // Injection is 1 unit
+                $non_med_qty += 1; // Injection is 1 unit
             }
             
             // Check in iv_details
-            $iv_name_norm = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($row['iv_details'] ?? '')));
+            $iv_name_norm = $clean_name($row['iv_details'] ?? '');
             if ($iv_name_norm === $med_name_norm && $iv_name_norm !== '') {
-                $qty_difference += 1; // IV is 1 unit
+                $non_med_qty += 1; // IV is 1 unit
             }
             
-            if ($qty_difference > 0 || $changed_meds) {
-                $new_cost_amount = (float)($row['cost_amount'] ?? 0) + ($cost_diff_per_unit * $qty_difference);
+            $non_med_cost_diff = $cost_diff_per_unit * $non_med_qty;
+            $total_diff = $med_cost_diff + $non_med_cost_diff;
+            
+            if ($changed_meds || $non_med_qty > 0) {
+                $new_cost_amount = (float)($row['cost_amount'] ?? 0) + $total_diff;
                 $upd = $conn->prepare("UPDATE {$table} SET medicines=?, cost_amount=? WHERE id=?");
                 $upd->execute([json_encode($meds), $new_cost_amount, $row['id']]);
             }
@@ -2810,7 +2823,7 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
     $inv_costs = [];
     $inv_tps = [];
     foreach ($inv_stmt->fetchAll() as $row) {
-        $name = $row['name'];
+        $name = str_replace("\xEF\xBB\xBF", "", $row['name']);
         $norm_name = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($name)));
         
         $cost = (float)$row['max_cost'];
@@ -2942,7 +2955,7 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
             $amt = (float)($m['amount'] ?? 0) - (float)($m['returned_amount'] ?? 0);
             
             $batch_id = $m['batch_id'] ?? null;
-            if (isset($m['cost'])) {
+            if (isset($m['cost']) && (float)$m['cost'] > 0) {
                 // Prefer the saved historical cost (updated via backfill)
                 $saved_total_cost = (float)$m['cost'];
                 $total_cost = ($p_qty > 0) ? ($saved_total_cost / $p_qty) * $qty : 0;
@@ -2951,7 +2964,8 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
                     $unit_cost = $inv_batches[$batch_id]['purchase_price'];
                     $tps = max(1, (int)$inv_batches[$batch_id]['tablets_per_strip']);
                 } else {
-                    $norm_m_name = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($name)));
+                    $name_clean = str_replace("\xEF\xBB\xBF", "", $name);
+                    $norm_m_name = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($name_clean)));
                     $unit_cost = $inv_costs[$name] ?? $inv_costs[$norm_m_name] ?? 0;
                     $tps = max(1, (int)($inv_tps[$name] ?? $inv_tps[$norm_m_name] ?? 1));
                 }
@@ -3148,8 +3162,10 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
                 $unit_cost = $inv_batches[$batch_id]['purchase_price'];
                 $tps = max(1, (int)$inv_batches[$batch_id]['tablets_per_strip']);
             } else {
-                $unit_cost = $inv_costs[$name] ?? 0;
-                $tps = max(1, (int)($inv_tps[$name] ?? 1));
+                $name_clean = str_replace("\xEF\xBB\xBF", "", $name);
+                $norm_m_name = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($name_clean)));
+                $unit_cost = $inv_costs[$name] ?? $inv_costs[$norm_m_name] ?? 0;
+                $tps = max(1, (int)($inv_tps[$name] ?? $inv_tps[$norm_m_name] ?? 1));
             }
             $actual_unit_cost = $unit_cost / $tps;
             $qty = (float)($m['qty'] ?? 0) - (float)($m['returned_qty'] ?? 0);

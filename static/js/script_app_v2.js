@@ -2214,7 +2214,7 @@ window.onunhandledrejection = function(event) {
         $('#pharmacyInjectionInputs').style.display = 'none';
         if ($('#pharmacyInjectionRows')) $('#pharmacyInjectionRows').innerHTML = '';
 
-        if ($('#pharmacyInjectionGroup')) $('#pharmacyInjectionGroup').style.display = 'none';
+        if ($('#pharmacyInjectionGroup')) $('#pharmacyInjectionGroup').style.display = 'block';
 
         const uptGroup = $('#pharmacyUPTGroup');
         const uptCheck = $('#pharmacyCheckUPT');
