@@ -9,23 +9,6 @@ if (!String.prototype.toFixed) {
     };
 }
 
-// Global Helper for Formatting Quantities
-window.formatMedicineQuantity = function(m) {
-    let qty = parseFloat(m.qty) || 0;
-    let strips = parseFloat(m.strips) || 0;
-    let tablets = parseFloat(m.tablets) || 0;
-    
-    if (m.strips !== undefined || m.tablets !== undefined) {
-        if (strips > 0 || tablets > 0) {
-            let parts = [];
-            if (strips > 0) parts.push(strips + ' (S)');
-            if (tablets > 0) parts.push(tablets + ' (T)');
-            return parts.join(', ');
-        }
-    }
-    return qty;
-};
-
 // Global Error Handling for Frontend Stability
 window.onerror = function(message, source, lineno, colno, error) {
     console.error("Caught JS Error:", message, "at", source, lineno + ":" + colno);
@@ -1618,8 +1601,7 @@ window.onunhandledrejection = function(event) {
         
         if (!newBrand) return toast('Please enter a Brand Name', 'error');
         
-        const genericInput = (row ? (row.querySelector('.med-name') || row.querySelector('.inj-name') || row.querySelector('.iv-name')) : null) || wrapper.parentElement.querySelector('input[type="text"]');
-        const genericName = genericInput ? genericInput.value.trim() : '';
+        const genericName = row.querySelector('.med-name').value.trim();
         const btn = wrapper.querySelector('button');
         if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
         
@@ -1629,14 +1611,14 @@ window.onunhandledrejection = function(event) {
                 body: { generic_name: genericName, brand_name: newBrand, unit_price: 0 }
             });
             if (res.success) {
-                if (genericInput) genericInput.value = newBrand;
+                row.querySelector('.med-name').value = newBrand;
                 wrapper.remove();
                 toast('New Brand successfully added to inventory!', 'success');
                 // Move focus to next input
-                const nextInput = row ? (row.querySelector('.med-qty') || row.querySelector('.inj-cost') || row.querySelector('.iv-cost')) : null;
-                if (nextInput) {
-                    nextInput.focus();
-                    nextInput.select();
+                const qtyInput = row.querySelector('.med-qty');
+                if (qtyInput) {
+                    qtyInput.focus();
+                    qtyInput.select();
                 }
             } else {
                 toast(res.error || res.message || 'Failed to add brand', 'error');
@@ -1718,39 +1700,21 @@ window.onunhandledrejection = function(event) {
 
         try {
             const items = await api(`/api/inventory/search?category=${safeEncodeURIComponent(category)}&q=${safeEncodeURIComponent(q)}`);
-            const validItems = items.filter(item => !item.is_generic_header);
-            const genericHeader = items.find(item => item.is_generic_header);
-            
-            if (validItems.length > 0 || genericHeader) {
-                let html = '';
-                if (validItems.length > 0) {
-                    html += validItems.map(item => {
-                        const price = item.selling_price || 0;
-                        return `
-                        <div class="med-sugg-item" style="padding:10px 12px; cursor:pointer; border-bottom:1px solid var(--border); transition: background 0.15s; background: var(--bg-card); color: var(--text-primary);" 
-                             onmouseenter="this.style.background='var(--bg-hover)'"
-                             onmouseleave="this.style.background='var(--bg-card)'"
-                             onclick="selectInventoryCategoryItem('${category}', '${item.name.replace(/'/g, "\\'")}', ${price}, '${inputEl.id}')">
-                            <div style="font-weight:600; margin-bottom:3px;">${item.name}</div>
-                              ${item.agency_name ? `<div style="font-size:0.8em; color:var(--text-secondary); margin-bottom:4px;">${item.agency_name}</div>` : ''}
-                            <div style="font-size:0.78rem; color:var(--text-secondary);">MRP: ₹${price.toFixed(2)} | Stock: ${item.stock}
-                                ${(item.row_location || item.col_location) ? ' | <span style="color:#6366f1;font-weight:600;">&#128205; Row: ' + (item.row_location || '-') + ' | Col: ' + (item.col_location || '-') + '</span>' : ''}
-                            </div>
-                        </div>`;
-                    }).join('');
-                }
-                
-                if (genericHeader) {
-                    html += `
-                        <div class="med-sugg-item" style="padding:12px; cursor:pointer; border-bottom:1px solid var(--border); transition:background 0.15s; background:var(--bg-card);"
-                            onmouseenter="this.style.background='var(--bg-hover)'"
-                            onmouseleave="this.style.background='var(--bg-card)'"
-                            onclick="selectInventoryCategoryItem('${category}', '${genericHeader.name.replace(/'/g,"\\'")}', ${genericHeader.selling_price||0}, '${inputEl.id}', 1)">
-                            <div style="font-weight:600; color:#3b82f6; font-size:0.95em;">+ Add New Brand</div>
-                        </div>`;
-                }
-
-                suggBox.innerHTML = html;
+            if (items.length > 0) {
+                suggBox.innerHTML = items.map(item => {
+                    const price = item.selling_price || 0;
+                    return `
+                    <div class="med-sugg-item" style="padding:10px 12px; cursor:pointer; border-bottom:1px solid var(--border); transition: background 0.15s; background: var(--bg-card); color: var(--text-primary);" 
+                         onmouseenter="this.style.background='var(--bg-hover)'"
+                         onmouseleave="this.style.background='var(--bg-card)'"
+                         onclick="selectInventoryCategoryItem('${category}', '${item.name.replace(/'/g, "\\'")}', ${price}, '${inputEl.id}')">
+                        <div style="font-weight:600; margin-bottom:3px;">${item.name}</div>
+                          ${item.agency_name ? `<div style="font-size:0.8em; color:var(--text-secondary); margin-bottom:4px;">${item.agency_name}</div>` : ''}
+                        <div style="font-size:0.78rem; color:var(--text-secondary);">MRP: ₹${price.toFixed(2)} | Stock: ${item.stock}
+                            ${(item.row_location || item.col_location) ? ' | <span style="color:#6366f1;font-weight:600;">&#128205; Row: ' + (item.row_location || '-') + ' | Col: ' + (item.col_location || '-') + '</span>' : ''}
+                        </div>
+                    </div>`;
+                }).join('');
                 suggBox.style.display = 'block';
             } else {
                 suggBox.style.display = 'none';
@@ -1760,32 +1724,11 @@ window.onunhandledrejection = function(event) {
         }
     };
 
-    window.selectInventoryCategoryItem = function (category, name, price, inputId, isUnmapped = 0) {
+    window.selectInventoryCategoryItem = function (category, name, price, inputId) {
         const input = $('#' + inputId);
         const suggBox = input ? input.nextElementSibling : null;
         if (input) input.value = name;
         if (suggBox) suggBox.style.display = 'none';
-
-        if (isUnmapped == 1 && input) {
-            const existing = input.parentNode.querySelector('.unmapped-brand-input');
-            if (existing) existing.remove();
-
-            const wrapper = document.createElement('div');
-            wrapper.className = 'unmapped-brand-input';
-            wrapper.style.marginTop = '8px';
-            wrapper.innerHTML = `<label style="font-size:0.85em; color:var(--text-secondary); margin-bottom:4px; display:block;">Brand Name</label>
-                                 <div style="display:flex; gap:6px;">
-                                     <input type="text" class="form-control med-new-brand" placeholder="Enter Brand Name" style="font-size:0.9em; border-color:#6366f1;" onkeydown="if(event.key === 'Enter') { event.preventDefault(); saveNewBrandInline(this); }">
-                                     <button type="button" class="btn btn-primary btn-sm" style="padding:0 12px; height:auto; min-height:unset;" onclick="saveNewBrandInline(this)">Save</button>
-                                 </div>`;
-            input.parentNode.appendChild(wrapper);
-            
-            setTimeout(() => {
-                const newBrandInput = input.parentNode.querySelector('.med-new-brand');
-                if (newBrandInput) newBrandInput.focus();
-            }, 10);
-            return;
-        }
 
         // Find corresponding cost input
         let costInput = null;
@@ -2048,7 +1991,7 @@ window.onunhandledrejection = function(event) {
             // A row is valid if it has a name — qty may be 0 for newly created
             // "Without Brand" medicines where pricing/stock is filled in later.
             // Only skip rows that are completely empty (no name at all).
-            if (name) medicines.push({ name, qty: totalQty, unit_price, amount, batch_id, tps, strips, tablets });
+            if (name) medicines.push({ name, qty: totalQty, unit_price, amount, batch_id });
         });
 
         let injCost = 0;
@@ -3475,7 +3418,7 @@ window.onunhandledrejection = function(event) {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${m.name}</td>
-                <td>${window.formatMedicineQuantity(m)}</td>
+                <td>${soldQty}</td>
                 <td style="color:var(--danger);">${alreadyReturned}</td>
                 <td style="font-weight:bold;">${available}</td>
                 <td>₹${unitPrice.toFixed(2)}</td>
