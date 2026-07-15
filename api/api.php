@@ -1465,6 +1465,42 @@ if ($uri === '/api/direct_sales/list' && $method === 'GET') {
     $rows = $stmt->fetchAll();
     foreach ($rows as &$r) {
         $meds = json_decode($r['medicines'], true) ?: [];
+        
+        // Append injections/iv/upt card to $meds so they are treated like medicines
+        if ($r['injection_details'] && trim($r['injection_details']) !== '') {
+            $meds[] = [
+                'name' => trim($r['injection_details']),
+                'qty' => 1,
+                'returned_qty' => 0,
+                'amount' => (float)$r['injection_cost'],
+                'cost' => 0,
+                'returned_amount' => 0,
+                'batch_id' => null
+            ];
+        }
+        if ($r['iv_details'] && trim($r['iv_details']) !== '') {
+            $meds[] = [
+                'name' => trim($r['iv_details']),
+                'qty' => 1,
+                'returned_qty' => 0,
+                'amount' => (float)$r['iv_cost'],
+                'cost' => 0,
+                'returned_amount' => 0,
+                'batch_id' => null
+            ];
+        }
+        if ((float)$r['upt_cost'] > 0) {
+            $meds[] = [
+                'name' => 'UPT Card',
+                'qty' => 1,
+                'returned_qty' => 0,
+                'amount' => (float)$r['upt_cost'],
+                'cost' => 0,
+                'returned_amount' => 0,
+                'batch_id' => null
+            ];
+        }
+
         foreach ($meds as &$m) {
             $qty = (float)($m['qty'] ?? 0);
             $ret = (float)($m['returned_qty'] ?? 0);
