@@ -2060,12 +2060,8 @@ window.onunhandledrejection = function(event) {
         try {
             const endpoint = (currentPrescId === 'direct') ? '/api/direct_sales/add' : '/api/add_medicines';
             if (currentPrescId === 'direct') {
-                payload.customer_name = $('#directPatName').value.trim();
+                payload.customer_name = $('#directPatName').value.trim() || 'Unknown Customer';
                 payload.mobile_number = $('#directPatPhone').value.trim();
-                if (!payload.customer_name) {
-                    if (waWin) waWin.close();
-                    return toast('Customer name is required for Direct Sale', 'error');
-                }
                 delete payload.patient_name;
                 delete payload.patient_phone;
                 delete payload.prescription_id;

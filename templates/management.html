@@ -2047,6 +2047,7 @@
                         <td>${statusBadge}</td>
                         <td style="display:flex; gap:6px; flex-wrap:wrap;">
                             <button class="btn btn-outline btn-sm" onclick='viewDirectSaleDetail(${JSON.stringify(r).replace(/'/g, "&apos;")})'>View</button>
+                            <button class="btn btn-outline btn-sm" onclick='editDirectSaleCustomer(${r.id}, "${(r.customer_name || '').replace(/"/g, "&quot;")}", "${(r.mobile_number || '').replace(/"/g, "&quot;")}")'>Edit</button>
                             <button class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger);" onclick="deleteDirectSale(${r.id})">Delete</button>
                         </td>
                     </tr>`;
@@ -2167,6 +2168,26 @@
                     renderReturnTimeline(div, returns, trueRetained, paidAmt);
                 }
             }).catch(e => { });
+        }
+
+        async function editDirectSaleCustomer(id, currentName, currentPhone) {
+            const newName = prompt('Enter new customer name:', currentName);
+            if (newName === null) return; // Cancelled
+            const newPhone = prompt('Enter new mobile number (optional):', currentPhone);
+            if (newPhone === null) return; // Cancelled
+
+            try {
+                const res = await api('/api/direct_sales/update_customer', { 
+                    method: 'POST', 
+                    body: { id: id, customer_name: newName, mobile_number: newPhone } 
+                });
+                if (res.success) {
+                    toast('Customer details updated', 'success');
+                    loadDirectSalesAdmin();
+                } else {
+                    toast(res.error || 'Update failed', 'error');
+                }
+            } catch(e) { toast(e.message || 'Update failed', 'error'); }
         }
 
         async function deleteDirectSale(id) {

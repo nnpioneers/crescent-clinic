@@ -1094,10 +1094,6 @@ if ($uri === '/api/direct_sales/add' && $method === 'POST') {
         $customer_name = trim($input['customer_name'] ?? '');
         $mobile_number = trim($input['mobile_number'] ?? '');
 
-        if (!$customer_name) {
-            throw new Exception('Customer name is required');
-        }
-
         $medicines       = $input['medicines'] ?? [];
         $injection_cost  = (float)($input['injection_cost'] ?? 0);
         $injection_details = $input['injection_details'] ?? '';
@@ -1458,6 +1454,21 @@ if ($uri === '/api/direct_sales/delete' && $method === 'POST') {
     }
 
     $conn->prepare("DELETE FROM direct_sales WHERE id=?")->execute([$sale_id]);
+    json_response(['success' => true]);
+}
+
+if ($uri === '/api/direct_sales/update_customer' && $method === 'POST') {
+    enforce_api_auth(['pharmacist']);
+    $conn = get_db();
+    $sale_id = (int)($input['id'] ?? 0);
+    $customer_name = trim($input['customer_name'] ?? '');
+    $mobile_number = trim($input['mobile_number'] ?? '');
+
+    if (!$sale_id) json_response(['success' => false, 'error' => 'Sale ID required'], 400);
+
+    $stmt = $conn->prepare("UPDATE direct_sales SET customer_name = ?, mobile_number = ? WHERE id = ?");
+    $stmt->execute([$customer_name, $mobile_number, $sale_id]);
+
     json_response(['success' => true]);
 }
 
