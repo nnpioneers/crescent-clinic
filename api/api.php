@@ -1880,6 +1880,12 @@ if ($uri === '/api/inventory/add' && $method === 'POST') {
     // The Without Brand placeholder record must remain permanent even when new brands are added.
     // Removed the deletion logic here to fix the bug where "Without Brand" disappears.
 
+    // Backfill historical zero-cost sales
+    if ($purchase_price > 0) {
+        $actual_unit_cost = ((int)$tablets_per_strip > 0) ? ((float)$purchase_price / (int)$tablets_per_strip) : (float)$purchase_price;
+        backfill_historical_medicine_cost($conn, $name, $actual_unit_cost, 0);
+    }
+
     json_response(['success' => true]);
 }
 
@@ -2782,8 +2788,16 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
     $upt_cost_calc = 0;
 
     // Top Medicines (now all medicines)
-    $stmt = $conn->query("SELECT doctor_id, medicines, injection_details, iv_details, upt_cost, injection_cost, iv_cost, paid_amount, balance_amount FROM prescriptions WHERE status='dispensed' AND $date_filter $doc_filter");
-    $med_rows = $stmt->fetchAll();
+    $stmt = $conn->query("SELECT doctor_id, medicines, injection_details, iv_details, upt_cost, injection_cost, iv_cost, paid_amount, balance_amount, payment_mode FROM prescriptions WHERE status='dispensed' AND $date_filter $doc_filter");
+    $p_rows = $stmt->fetchAll();
+    
+    $ds_rows = [];
+    if ($doctor_type === 'all' || empty($doctor_type)) {
+        $stmt_ds = $conn->query("SELECT '' as doctor_id, medicines, injection_details, iv_details, 0 as upt_cost, 0 as injection_cost, 0 as iv_cost, paid_amount, balance_amount, payment_mode FROM direct_sales WHERE $date_filter");
+        $ds_rows = $stmt_ds->fetchAll();
+    }
+    
+    $med_rows = array_merge($p_rows, $ds_rows);
     $med_stats = [];
     $doc_med_stats = [];
     
