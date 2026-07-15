@@ -909,86 +909,94 @@ if (($uri === '/api/add_medicines' || $uri === '/api/direct_pharmacy') && $metho
 
         $total_cost = 0.0;
         
-        foreach ($medicines as $m) {
-            $name = $m['name'] ?? null;
-            $qty = (int)($m['qty'] ?? 0);
-            $batch_id = $m['batch_id'] ?? '';
-            $tps_input = max(1, (int)($m['tps'] ?? 1));
-            $unit_price_input = (float)($m['unit_price'] ?? 0);
-            
-            if ($name && $qty > 0) {
-                if ($batch_id) {
-                    $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, tablets_per_strip, mrp, selling_price FROM inventory WHERE id=?");
-                    $stmt->execute([$batch_id]);
-                    $row = $stmt->fetch();
-                    if ($row) {
-                        $tps = max(1, (int)($row['tablets_per_strip'] ?? 1));
-                        
-                        if ((float)($row['mrp'] ?? 0) <= 0 || (float)($row['selling_price'] ?? 0) <= 0) {
-                            $new_mrp = $unit_price_input * $tps_input;
-                            $conn->prepare("UPDATE inventory SET mrp = ?, selling_price = ?, tablets_per_strip = ? WHERE id=?")
-                                 ->execute([$new_mrp, $new_mrp, $tps_input, $batch_id]);
-                            $tps = $tps_input;
-                        }
-                        
-                        $cost_per_unit = (float)$row['purchase_price'] / $tps;
-                        $total_cost += $cost_per_unit * $qty;
-                        $stmt = $conn->prepare("UPDATE inventory SET stock = stock - ? WHERE id=?");
-                        $stmt->execute([$qty, $batch_id]);
-                        
-                        // Sync stock to agency inventory
-                        sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
-                    }
-                } else {
-                    ensure_synthesized_inventory($conn, $name);
-                    $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, tablets_per_strip, id, mrp, selling_price FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
-                    $stmt->execute([$name]);
-                    $row = $stmt->fetch();
+    foreach ($medicines as &$m) {
+        $name = $m['name'] ?? null;
+        $qty = (int)($m['qty'] ?? 0);
+        $batch_id = $m['batch_id'] ?? '';
+        $tps_input = max(1, (int)($m['tps'] ?? 1));
+        $unit_price_input = (float)($m['unit_price'] ?? 0);
+        $m_cost = 0.0;
+        $rev = (float)($m['amount'] ?? 0);
+        
+        if ($name && $qty > 0) {
+            if ($batch_id) {
+                $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, tablets_per_strip, mrp, selling_price FROM inventory WHERE id=?");
+                $stmt->execute([$batch_id]);
+                $row = $stmt->fetch();
+                if ($row) {
+                    $tps = max(1, (int)($row['tablets_per_strip'] ?? 1));
                     
-                    if (!$row && stripos(trim($name), '(Without Brand)') === false) {
-                        $check_name = trim($name) . ' (Without Brand)';
-                        $stmt->execute([$check_name]);
-                        $row = $stmt->fetch();
-                    }
-                    
-                    if ($row) {
-                        $tps = max(1, (int)($row['tablets_per_strip'] ?? 1));
-                        
-                        if ((float)($row['mrp'] ?? 0) <= 0 || (float)($row['selling_price'] ?? 0) <= 0) {
-                            $new_mrp = $unit_price_input * $tps_input;
-                            $conn->prepare("UPDATE inventory SET mrp = ?, selling_price = ?, tablets_per_strip = ? WHERE id=?")
-                                 ->execute([$new_mrp, $new_mrp, $tps_input, $row['id']]);
-                            $tps = $tps_input;
-                        }
-                        
-                        $cost_per_unit = (float)$row['purchase_price'] / $tps;
-                        $total_cost += $cost_per_unit * $qty;
-                        $stmt = $conn->prepare("UPDATE inventory SET stock = stock - ? WHERE id=?");
-                        $stmt->execute([$qty, $row['id']]);
-                        
-                        // Sync stock to agency inventory
-                        sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
-                    } else {
-                        $batch = 'manual_default';
+                    if ((float)($row['mrp'] ?? 0) <= 0 || (float)($row['selling_price'] ?? 0) <= 0) {
+                        $new_mrp = $unit_price_input * $tps_input;
+                        $conn->prepare("UPDATE inventory SET mrp = ?, selling_price = ?, tablets_per_strip = ? WHERE id=?")
+                             ->execute([$new_mrp, $new_mrp, $tps_input, $batch_id]);
                         $tps = $tps_input;
-                        $mrp = $unit_price_input * $tps_input;
-                        $cat = 'Tablet';
-                        $new_name = trim($name);
-                        if (stripos($new_name, '(Without Brand)') === false) {
-                            $new_name .= ' (Without Brand)';
-                        }
-                        $orig_name = trim($name);
-                        $stmt_ins = $conn->prepare("INSERT INTO inventory (name, generic_name, mrp, selling_price, purchase_price, stock, category, batch_number, tablets_per_strip) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?)");
-                        $stmt_ins->execute([$new_name, $orig_name, $mrp, $mrp, -$qty, $cat, $batch, $tps]);
-                        
-                        $stmt_ai = $conn->prepare("INSERT IGNORE INTO agency_items (item_name, generic_name, mrp, selling_price, purchase_price, stock, batch_number) VALUES (?, ?, ?, ?, 0, ?, ?)");
-                        $stmt_ai->execute([$new_name, $orig_name, $mrp, $mrp, -$qty, $batch]);
-                        
-                        sync_stock_item($conn, $new_name, $batch, 'pharmacy');
                     }
+                    
+                    $cost_per_unit = (float)$row['purchase_price'] / $tps;
+                    $m_cost = $cost_per_unit * $qty;
+                    $total_cost += $m_cost;
+                    $stmt = $conn->prepare("UPDATE inventory SET stock = stock - ? WHERE id=?");
+                    $stmt->execute([$qty, $batch_id]);
+                    
+                    // Sync stock to agency inventory
+                    sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
+                }
+            } else {
+                ensure_synthesized_inventory($conn, $name);
+                $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, tablets_per_strip, id, mrp, selling_price FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
+                $stmt->execute([$name]);
+                $row = $stmt->fetch();
+                
+                if (!$row && stripos(trim($name), '(Without Brand)') === false) {
+                    $check_name = trim($name) . ' (Without Brand)';
+                    $stmt->execute([$check_name]);
+                    $row = $stmt->fetch();
+                }
+                
+                if ($row) {
+                    $tps = max(1, (int)($row['tablets_per_strip'] ?? 1));
+                    
+                    if ((float)($row['mrp'] ?? 0) <= 0 || (float)($row['selling_price'] ?? 0) <= 0) {
+                        $new_mrp = $unit_price_input * $tps_input;
+                        $conn->prepare("UPDATE inventory SET mrp = ?, selling_price = ?, tablets_per_strip = ? WHERE id=?")
+                             ->execute([$new_mrp, $new_mrp, $tps_input, $row['id']]);
+                        $tps = $tps_input;
+                    }
+                    
+                    $cost_per_unit = (float)$row['purchase_price'] / $tps;
+                    $m_cost = $cost_per_unit * $qty;
+                    $total_cost += $m_cost;
+                    $stmt = $conn->prepare("UPDATE inventory SET stock = stock - ? WHERE id=?");
+                    $stmt->execute([$qty, $row['id']]);
+                    
+                    // Sync stock to agency inventory
+                    sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
+                } else {
+                    $batch = 'manual_default';
+                    $tps = $tps_input;
+                    $mrp = $unit_price_input * $tps_input;
+                    $cat = 'Tablet';
+                    $new_name = trim($name);
+                    if (stripos($new_name, '(Without Brand)') === false) {
+                        $new_name .= ' (Without Brand)';
+                    }
+                    $orig_name = trim($name);
+                    $stmt_ins = $conn->prepare("INSERT INTO inventory (name, generic_name, mrp, selling_price, purchase_price, stock, category, batch_number, tablets_per_strip) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?)");
+                    $stmt_ins->execute([$new_name, $orig_name, $mrp, $mrp, -$qty, $cat, $batch, $tps]);
+                    
+                    $stmt_ai = $conn->prepare("INSERT IGNORE INTO agency_items (item_name, generic_name, mrp, selling_price, purchase_price, stock, batch_number) VALUES (?, ?, ?, ?, 0, ?, ?)");
+                    $stmt_ai->execute([$new_name, $orig_name, $mrp, $mrp, -$qty, $batch]);
+                    
+                    sync_stock_item($conn, $new_name, $batch, 'pharmacy');
                 }
             }
         }
+        $m['cost'] = $m_cost;
+        $m['revenue'] = $rev;
+        $m['profit'] = $rev - $m_cost;
+    }
+    unset($m);
 
         $deduct_stock_by_name = function($item_name, $category, $cost = 0) use ($conn, &$total_cost) {
             if (!$item_name || trim($item_name) === '') return;
