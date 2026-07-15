@@ -2788,8 +2788,8 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
     $upt_cost_calc = 0;
 
     // Top Medicines (now all medicines)
-    $stmt = $conn->query("SELECT doctor_id, medicines, injection_details, iv_details, upt_cost, injection_cost, iv_cost, paid_amount, balance_amount, payment_mode FROM prescriptions WHERE status='dispensed' AND $date_filter $doc_filter");
-    $p_rows = $stmt->fetchAll();
+    $stmt = $conn->query("SELECT doctor_id, medicines, injection_details, iv_details, upt_cost, injection_cost, iv_cost, paid_amount, balance_amount, TRIM(CONCAT_WS(',', IF(cash_amount > 0, 'Cash', NULL), IF(gpay_amount > 0, 'GPay', NULL), IF(phonepe_amount > 0, 'PhonePe', NULL), IF(bank_amount > 0, 'Bank', NULL))) as payment_mode FROM prescriptions WHERE status='dispensed' AND $date_filter $doc_filter");
+    $p_rows = $stmt ? $stmt->fetchAll() : [];
     
     $ds_rows = [];
     if ($doctor_type === 'all' || empty($doctor_type)) {
