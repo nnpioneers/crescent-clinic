@@ -1917,7 +1917,7 @@ function backfill_historical_medicine_cost($conn, $med_name, $unit_cost, $old_un
                         $qty_difference += $total_qty;
                         $new_cost = $unit_cost * $total_qty;
                         $m['cost'] = $new_cost;
-                        $m['profit'] = (float)($m['revenue'] ?? 0) - $new_cost;
+                        $m['profit'] = (float)($m['revenue'] ?? $m['amount'] ?? 0) - $new_cost;
                         $changed_meds = true;
                     }
                 }
@@ -2804,19 +2804,11 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
     $iv_cost_calc = 0;
     $upt_cost_calc = 0;
 
-    // Top Medicines (now all medicines)
+    // Top Medicines (now all medicines - only doctor consultation)
     $stmt = $conn->query("SELECT doctor_id, medicines, injection_details, iv_details, upt_cost, injection_cost, iv_cost, paid_amount, balance_amount, TRIM(CONCAT_WS(',', IF(cash_amount > 0, 'Cash', NULL), IF(gpay_amount > 0, 'GPay', NULL), IF(phonepe_amount > 0, 'PhonePe', NULL), IF(bank_amount > 0, 'Bank', NULL))) as payment_mode FROM prescriptions WHERE status='dispensed' AND $date_filter $doc_filter");
     $p_rows = $stmt ? $stmt->fetchAll() : [];
     
-    $ds_rows = [];
-    if ($doctor_type === 'all' || empty($doctor_type)) {
-        $stmt_ds = $conn->query("SELECT '' as doctor_id, medicines, injection_details, iv_details, upt_cost, injection_cost, iv_cost, paid_amount, balance_amount, TRIM(CONCAT_WS(',', IF(cash_amount > 0, 'Cash', NULL), IF(gpay_amount > 0, 'GPay', NULL), IF(phonepe_amount > 0, 'PhonePe', NULL), IF(bank_amount > 0, 'Bank', NULL))) as payment_mode FROM direct_sales WHERE $date_filter");
-        if ($stmt_ds) {
-            $ds_rows = $stmt_ds->fetchAll();
-        }
-    }
-    
-    $med_rows = array_merge($p_rows, $ds_rows);
+    $med_rows = $p_rows;
     $med_stats = [];
     $doc_med_stats = [];
     

@@ -3562,7 +3562,7 @@
                                     qtyHtml = `${displayStr}`;
                                 }
 
-                                const revenue = parseFloat(m.revenue) || 0;
+                                const revenue = parseFloat(m.revenue) || parseFloat(m.amount) || 0;
                                 totalRevenueSum += revenue;
 
                                 // Show Bill/Paid/Balance only on first medicine row of each sale
@@ -3701,7 +3701,7 @@
                                 }
 
                                 const cost = parseFloat(m.cost) || 0;
-                                const revenue = parseFloat(m.revenue) || 0;
+                                const revenue = parseFloat(m.revenue) || parseFloat(m.amount) || 0;
                                 const payRecv = revenue * payRatio;
                                 const profit = payRecv - (cost * payRatio);
 
