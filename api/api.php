@@ -1906,7 +1906,9 @@ function backfill_historical_medicine_cost($conn, $med_name, $unit_cost, $old_un
             
             // Check in medicines JSON
             foreach ($meds as &$m) {
-                if (trim(strtolower($m['name'] ?? '')) === trim(strtolower($med_name))) {
+                $m_name_norm = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($m['name'] ?? '')));
+                $med_name_norm = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($med_name)));
+                if ($m_name_norm === $med_name_norm && $m_name_norm !== '') {
                     $total_qty = (int)($m['qty'] ?? 0);
                     $returned_qty = (int)($m['returned_qty'] ?? 0);
                     $net_qty = $total_qty - $returned_qty;
@@ -2762,12 +2764,24 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
     }
 
     // Fetch average purchase costs and tablets_per_strip from inventory
-    $inv_stmt = $conn->query("SELECT name, MAX(tablets_per_strip) as tablets_per_strip, AVG(purchase_price) as avg_cost FROM inventory GROUP BY name");
+    $inv_stmt = $conn->query("SELECT name, MAX(tablets_per_strip) as tablets_per_strip, MAX(purchase_price) as max_cost FROM inventory GROUP BY name");
     $inv_costs = [];
     $inv_tps = [];
     foreach ($inv_stmt->fetchAll() as $row) {
-        $inv_costs[$row['name']] = (float)$row['avg_cost'];
-        $inv_tps[$row['name']] = (int)$row['tablets_per_strip'];
+        $name = $row['name'];
+        $norm_name = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($name)));
+        
+        $cost = (float)$row['max_cost'];
+        
+        // Save exact name
+        $inv_costs[$name] = $cost;
+        $inv_tps[$name] = (int)$row['tablets_per_strip'];
+        
+        // Save normalized name (prefer higher cost if collision)
+        if (!isset($inv_costs[$norm_name]) || $cost > $inv_costs[$norm_name]) {
+            $inv_costs[$norm_name] = $cost;
+            $inv_tps[$norm_name] = (int)$row['tablets_per_strip'];
+        }
     }
 
     $inv_batch_stmt = $conn->query("SELECT id, purchase_price, tablets_per_strip FROM inventory");
@@ -2903,8 +2917,9 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
                     $unit_cost = $inv_batches[$batch_id]['purchase_price'];
                     $tps = max(1, (int)$inv_batches[$batch_id]['tablets_per_strip']);
                 } else {
-                    $unit_cost = $inv_costs[$name] ?? 0;
-                    $tps = max(1, (int)($inv_tps[$name] ?? 1));
+                    $norm_m_name = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($name)));
+                    $unit_cost = $inv_costs[$name] ?? $inv_costs[$norm_m_name] ?? 0;
+                    $tps = max(1, (int)($inv_tps[$name] ?? $inv_tps[$norm_m_name] ?? 1));
                 }
                 $actual_unit_cost = $unit_cost / $tps;
                 $total_cost = $actual_unit_cost * $qty;
