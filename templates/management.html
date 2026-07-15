@@ -3809,7 +3809,7 @@
                             <td style="text-align:right">₹${(med.revenue || 0).toFixed(2)}</td>
                             <td style="text-align:right; font-weight:bold; color:var(--emerald);">₹${(med.payment_received || 0).toFixed(2)}</td>
                             <td style="text-align:right; font-weight:bold; color:${balance > 0 ? 'var(--danger)' : 'var(--emerald)'};">${balance > 0 ? '₹' + balance.toFixed(2) : '✓ Cleared'}</td>
-                            <td style="font-size:0.85em;">-</td>
+                            <td style="font-size:0.85em;">${med.payment_mode || '-'}</td>
                             <td style="text-align:right; color:${profitColor}; font-weight:bold;">₹${(med.realized_profit || 0).toFixed(2)}</td>
                         </tr>
                     `;

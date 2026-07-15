@@ -2878,18 +2878,24 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
             $amt = (float)($m['amount'] ?? 0) - (float)($m['returned_amount'] ?? 0);
             
             $batch_id = $m['batch_id'] ?? null;
-            if ($batch_id && isset($inv_batches[$batch_id])) {
-                $unit_cost = $inv_batches[$batch_id]['purchase_price'];
-                $tps = max(1, (int)$inv_batches[$batch_id]['tablets_per_strip']);
+            if (isset($m['cost'])) {
+                // Prefer the saved historical cost (updated via backfill)
+                $saved_total_cost = (float)$m['cost'];
+                $total_cost = ($p_qty > 0) ? ($saved_total_cost / $p_qty) * $qty : 0;
             } else {
-                $unit_cost = $inv_costs[$name] ?? 0;
-                $tps = max(1, (int)($inv_tps[$name] ?? 1));
+                if ($batch_id && isset($inv_batches[$batch_id])) {
+                    $unit_cost = $inv_batches[$batch_id]['purchase_price'];
+                    $tps = max(1, (int)$inv_batches[$batch_id]['tablets_per_strip']);
+                } else {
+                    $unit_cost = $inv_costs[$name] ?? 0;
+                    $tps = max(1, (int)($inv_tps[$name] ?? 1));
+                }
+                $actual_unit_cost = $unit_cost / $tps;
+                $total_cost = $actual_unit_cost * $qty;
             }
-            $actual_unit_cost = $unit_cost / $tps;
-            $total_cost = $actual_unit_cost * $qty;
             $profit = $amt - $total_cost;
 
-            if (!isset($med_stats[$name])) $med_stats[$name] = ['qty' => 0, 'purchased_qty' => 0, 'returned_qty' => 0, 'cost' => 0, 'revenue' => 0, 'profit' => 0, 'payment_received' => 0, 'realized_profit' => 0];
+            if (!isset($med_stats[$name])) $med_stats[$name] = ['qty' => 0, 'purchased_qty' => 0, 'returned_qty' => 0, 'cost' => 0, 'revenue' => 0, 'profit' => 0, 'payment_received' => 0, 'realized_profit' => 0, 'modes' => []];
             $med_stats[$name]['qty'] += $qty;
             $med_stats[$name]['purchased_qty'] += $p_qty;
             $med_stats[$name]['returned_qty'] += $r_qty;
@@ -2899,7 +2905,15 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
             $med_stats[$name]['payment_received'] += ($amt * $pay_ratio);
             $med_stats[$name]['realized_profit'] += ($profit * $pay_ratio);
             
-            if (!isset($doc_med_stats[$did][$name])) $doc_med_stats[$did][$name] = ['qty' => 0, 'purchased_qty' => 0, 'returned_qty' => 0, 'cost' => 0, 'revenue' => 0, 'profit' => 0, 'payment_received' => 0, 'realized_profit' => 0];
+            $pm = trim($row['payment_mode'] ?? '');
+            if ($pm) {
+                $pmodes = array_map('trim', explode(',', $pm));
+                foreach ($pmodes as $m_pm) {
+                    if ($m_pm && !in_array($m_pm, $med_stats[$name]['modes'])) $med_stats[$name]['modes'][] = $m_pm;
+                }
+            }
+            
+            if (!isset($doc_med_stats[$did][$name])) $doc_med_stats[$did][$name] = ['qty' => 0, 'purchased_qty' => 0, 'returned_qty' => 0, 'cost' => 0, 'revenue' => 0, 'profit' => 0, 'payment_received' => 0, 'realized_profit' => 0, 'modes' => []];
             $doc_med_stats[$did][$name]['qty'] += $qty;
             $doc_med_stats[$did][$name]['purchased_qty'] += $p_qty;
             $doc_med_stats[$did][$name]['returned_qty'] += $r_qty;
@@ -2908,6 +2922,11 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
             $doc_med_stats[$did][$name]['profit'] += $profit;
             $doc_med_stats[$did][$name]['payment_received'] += ($amt * $pay_ratio);
             $doc_med_stats[$did][$name]['realized_profit'] += ($profit * $pay_ratio);
+            if ($pm) {
+                foreach ($pmodes as $m_pm) {
+                    if ($m_pm && !in_array($m_pm, $doc_med_stats[$did][$name]['modes'])) $doc_med_stats[$did][$name]['modes'][] = $m_pm;
+                }
+            }
         }
     }
     
@@ -2923,7 +2942,8 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
             'revenue' => $stats['revenue'],
             'profit' => $stats['profit'],
             'payment_received' => $stats['payment_received'] ?? 0,
-            'realized_profit' => $stats['realized_profit'] ?? 0
+            'realized_profit' => $stats['realized_profit'] ?? 0,
+            'payment_mode' => isset($stats['modes']) && count($stats['modes']) > 0 ? implode(', ', $stats['modes']) : '-'
         ];
         $true_med_cost += $stats['cost'];
     }
@@ -2942,7 +2962,8 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
                 'revenue' => $stats['revenue'],
                 'profit' => $stats['profit'],
                 'payment_received' => $stats['payment_received'] ?? 0,
-                'realized_profit' => $stats['realized_profit'] ?? 0
+                'realized_profit' => $stats['realized_profit'] ?? 0,
+                'payment_mode' => isset($stats['modes']) && count($stats['modes']) > 0 ? implode(', ', $stats['modes']) : '-'
             ];
         }
         usort($doc_all_meds, function($a, $b) { return $b['revenue'] <=> $a['revenue']; });
