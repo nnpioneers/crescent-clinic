@@ -5926,6 +5926,7 @@ if ($uri === '/api/generics/rename-generic' && $method === 'POST') {
         // Update generic_mappings
         $stmt3 = $conn->prepare("UPDATE generic_mappings SET generic_name = ? WHERE TRIM(LOWER(generic_name)) = TRIM(LOWER(?))");
         $stmt3->execute([$new_name, $old_name]);
+        $conn->prepare("UPDATE generic_mappings SET brand_name = ? WHERE TRIM(LOWER(brand_name)) = TRIM(LOWER(?))")->execute([$new_wb_name, $old_wb_name]);
         
         // Audit trail
         $conn->prepare("
