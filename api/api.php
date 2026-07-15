@@ -944,6 +944,13 @@ if (($uri === '/api/add_medicines' || $uri === '/api/direct_pharmacy') && $metho
                     $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, tablets_per_strip, id, mrp, selling_price FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
                     $stmt->execute([$name]);
                     $row = $stmt->fetch();
+                    
+                    if (!$row && stripos(trim($name), '(Without Brand)') === false) {
+                        $check_name = trim($name) . ' (Without Brand)';
+                        $stmt->execute([$check_name]);
+                        $row = $stmt->fetch();
+                    }
+                    
                     if ($row) {
                         $tps = max(1, (int)($row['tablets_per_strip'] ?? 1));
                         
@@ -990,6 +997,13 @@ if (($uri === '/api/add_medicines' || $uri === '/api/direct_pharmacy') && $metho
             $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, id, mrp, selling_price FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
             $stmt->execute([trim($item_name)]);
             $row = $stmt->fetch();
+            
+            if (!$row && stripos(trim($item_name), '(Without Brand)') === false) {
+                $check_name = trim($item_name) . ' (Without Brand)';
+                $stmt->execute([$check_name]);
+                $row = $stmt->fetch();
+            }
+            
             if ($row) {
                 if ($cost > 0 && ((float)$row['mrp'] <= 0 || (float)$row['selling_price'] <= 0)) {
                     $conn->prepare("UPDATE inventory SET mrp=?, selling_price=? WHERE id=?")->execute([$cost, $cost, $row['id']]);
@@ -1148,6 +1162,13 @@ if ($uri === '/api/direct_sales/add' && $method === 'POST') {
                     $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, tablets_per_strip, id, mrp, selling_price FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
                     $stmt->execute([$name]);
                     $row = $stmt->fetch();
+                    
+                    if (!$row && stripos(trim($name), '(Without Brand)') === false) {
+                        $check_name = trim($name) . ' (Without Brand)';
+                        $stmt->execute([$check_name]);
+                        $row = $stmt->fetch();
+                    }
+                    
                     if ($row) {
                         $tps = max(1, (int)($row['tablets_per_strip'] ?? 1));
                         
@@ -1197,6 +1218,13 @@ if ($uri === '/api/direct_sales/add' && $method === 'POST') {
             $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, id, mrp, selling_price FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
             $stmt->execute([trim($item_name)]);
             $row = $stmt->fetch();
+            
+            if (!$row && stripos(trim($item_name), '(Without Brand)') === false) {
+                $check_name = trim($item_name) . ' (Without Brand)';
+                $stmt->execute([$check_name]);
+                $row = $stmt->fetch();
+            }
+            
             if ($row) {
                 if ($cost > 0 && ((float)$row['mrp'] <= 0 || (float)$row['selling_price'] <= 0)) {
                     $conn->prepare("UPDATE inventory SET mrp=?, selling_price=? WHERE id=?")->execute([$cost, $cost, $row['id']]);
