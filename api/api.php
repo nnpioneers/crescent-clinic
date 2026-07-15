@@ -90,6 +90,18 @@ function enforce_admin() {
         }
     }
 }
+
+function normalize_medicine_name($name) {
+    // 1. Strip BOM
+    $name = str_replace("\xEF\xBB\xBF", "", $name);
+    $name = str_replace(chr(0xEF).chr(0xBB).chr(0xBF), "", $name);
+    // 2. Strip (Without Brand) and (Sold Without Brand)
+    $name = str_ireplace([' (without brand)', ' (sold without brand)'], '', $name);
+    // 3. Strip category tags in parentheses (e.g., (INJ), (TAB), (CAP), (SYR), etc.)
+    $name = preg_replace('/\s*\([A-Za-z]{2,4}\)/', '', $name);
+    // 4. Return trimmed lowercase
+    return trim(strtolower($name));
+}
 // Auto-detect medicine category from item name using short-form codes
 function detect_medicine_category($item_name) {
     $name = strtoupper(trim($item_name));
@@ -1434,13 +1446,8 @@ if ($uri === '/api/direct_sales/list' && $method === 'GET') {
     $inv_costs = [];
     $inv_tps = [];
     foreach ($inv_stmt->fetchAll() as $row) {
-        $name = str_replace("\xEF\xBB\xBF", "", $row['name']);
-        $name = str_replace("\ufeff", "", $name);
-        $name = str_replace("\u200b", "", $name);
-        // Direct byte order stripping just in case
-        $name = str_replace("\xef\xbb\xbf", "", $name);
-        $name = str_replace(chr(0xEF).chr(0xBB).chr(0xBF), "", $name);
-        $norm_name = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($name)));
+        $name = str_replace(chr(0xEF).chr(0xBB).chr(0xBF), "", $row['name']);
+        $norm_name = normalize_medicine_name($name);
         
         $cost = (float)$row['max_cost'];
         $inv_costs[$name] = $cost;
@@ -1515,8 +1522,7 @@ if ($uri === '/api/direct_sales/list' && $method === 'GET') {
                     $unit_cost = $inv_batches[$batch_id]['purchase_price'];
                     $tps = max(1, (int)$inv_batches[$batch_id]['tablets_per_strip']);
                 } else {
-                    $name_clean = str_replace(chr(0xEF).chr(0xBB).chr(0xBF), "", $name);
-                    $norm_m_name = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($name_clean)));
+                    $norm_m_name = normalize_medicine_name($name);
                     $unit_cost = $inv_costs[$name] ?? $inv_costs[$norm_m_name] ?? 0;
                     $tps = max(1, (int)($inv_tps[$name] ?? $inv_tps[$norm_m_name] ?? 1));
                 }
@@ -2026,13 +2032,7 @@ function backfill_historical_medicine_cost($conn, $med_name, $unit_cost, $old_un
     if ($unit_cost < 0) return;
     if (abs($unit_cost - $old_unit_cost) < 0.01) return; // No change
     
-    // Clean name of BOM and Without Brand suffix
-    $clean_name = function($str) {
-        $str = str_replace("\xEF\xBB\xBF", "", $str);
-        return trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($str)));
-    };
-    
-    $med_name_norm = $clean_name($med_name);
+    $med_name_norm = normalize_medicine_name($med_name);
     $med_name_safe = addslashes($med_name_norm);
     $cost_diff_per_unit = $unit_cost - $old_unit_cost;
     
@@ -2046,7 +2046,7 @@ function backfill_historical_medicine_cost($conn, $med_name, $unit_cost, $old_un
             
             // Check in medicines JSON
             foreach ($meds as &$m) {
-                $m_name_norm = $clean_name($m['name'] ?? '');
+                $m_name_norm = normalize_medicine_name($m['name'] ?? '');
                 if ($m_name_norm === $med_name_norm && $m_name_norm !== '') {
                     $total_qty = (int)($m['qty'] ?? 0);
                     $returned_qty = (int)($m['returned_qty'] ?? 0);
@@ -2065,13 +2065,13 @@ function backfill_historical_medicine_cost($conn, $med_name, $unit_cost, $old_un
             
             $non_med_qty = 0;
             // Check in injection_details
-            $inj_name_norm = $clean_name($row['injection_details'] ?? '');
+            $inj_name_norm = normalize_medicine_name($row['injection_details'] ?? '');
             if ($inj_name_norm === $med_name_norm && $inj_name_norm !== '') {
                 $non_med_qty += 1; // Injection is 1 unit
             }
             
             // Check in iv_details
-            $iv_name_norm = $clean_name($row['iv_details'] ?? '');
+            $iv_name_norm = normalize_medicine_name($row['iv_details'] ?? '');
             if ($iv_name_norm === $med_name_norm && $iv_name_norm !== '') {
                 $non_med_qty += 1; // IV is 1 unit
             }
@@ -2915,8 +2915,8 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
     $inv_costs = [];
     $inv_tps = [];
     foreach ($inv_stmt->fetchAll() as $row) {
-        $name = str_replace("\xEF\xBB\xBF", "", $row['name']);
-        $norm_name = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($name)));
+        $name = str_replace(chr(0xEF).chr(0xBB).chr(0xBF), "", $row['name']);
+        $norm_name = normalize_medicine_name($name);
         
         $cost = (float)$row['max_cost'];
         
@@ -2967,8 +2967,7 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
 
         if ($row['injection_details']) {
             $name = trim($row['injection_details']);
-            $name = str_replace(chr(0xEF).chr(0xBB).chr(0xBF), "", $name);
-            $norm_name = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($name)));
+            $norm_name = normalize_medicine_name($name);
             $cost = $inv_costs[$name] ?? $inv_costs[$norm_name] ?? 0;
             $inj_cost_calc += $cost;
             $rev = (float)$row['injection_cost'];
@@ -2993,8 +2992,7 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
         }
         if ($row['iv_details']) {
             $name = trim($row['iv_details']);
-            $name = str_replace(chr(0xEF).chr(0xBB).chr(0xBF), "", $name);
-            $norm_name = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($name)));
+            $norm_name = normalize_medicine_name($name);
             $cost = $inv_costs[$name] ?? $inv_costs[$norm_name] ?? 0;
             $iv_cost_calc += $cost;
             $rev = (float)$row['iv_cost'];
@@ -3060,8 +3058,7 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
                     $unit_cost = $inv_batches[$batch_id]['purchase_price'];
                     $tps = max(1, (int)$inv_batches[$batch_id]['tablets_per_strip']);
                 } else {
-                    $name_clean = str_replace("\xEF\xBB\xBF", "", $name);
-                    $norm_m_name = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($name_clean)));
+                    $norm_m_name = normalize_medicine_name($name);
                     $unit_cost = $inv_costs[$name] ?? $inv_costs[$norm_m_name] ?? 0;
                     $tps = max(1, (int)($inv_tps[$name] ?? $inv_tps[$norm_m_name] ?? 1));
                 }
@@ -3258,8 +3255,7 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
                 $unit_cost = $inv_batches[$batch_id]['purchase_price'];
                 $tps = max(1, (int)$inv_batches[$batch_id]['tablets_per_strip']);
             } else {
-                $name_clean = str_replace("\xEF\xBB\xBF", "", $name);
-                $norm_m_name = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($name_clean)));
+                $norm_m_name = normalize_medicine_name($name);
                 $unit_cost = $inv_costs[$name] ?? $inv_costs[$norm_m_name] ?? 0;
                 $tps = max(1, (int)($inv_tps[$name] ?? $inv_tps[$norm_m_name] ?? 1));
             }
