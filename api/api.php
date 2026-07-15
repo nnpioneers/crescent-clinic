@@ -1893,12 +1893,13 @@ function backfill_historical_medicine_cost($conn, $med_name, $unit_cost, $old_un
     if ($unit_cost < 0) return;
     if (abs($unit_cost - $old_unit_cost) < 0.01) return; // No change
     
-    $med_name_safe = addslashes($med_name);
+    $med_name_norm = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($med_name)));
+    $med_name_safe = addslashes($med_name_norm);
     $cost_diff_per_unit = $unit_cost - $old_unit_cost;
     
     $tables = ['direct_sales', 'prescriptions'];
     foreach ($tables as $table) {
-        $stmt = $conn->query("SELECT id, medicines, injection_details, iv_details, cost_amount, total_amount FROM {$table} WHERE medicines LIKE '%" . $med_name_safe . "%' OR injection_details LIKE '%" . $med_name_safe . "%' OR iv_details LIKE '%" . $med_name_safe . "%'");
+        $stmt = $conn->query("SELECT id, medicines, injection_details, iv_details, cost_amount, total_amount FROM {$table} WHERE LOWER(medicines) LIKE '%" . $med_name_safe . "%' OR LOWER(injection_details) LIKE '%" . $med_name_safe . "%' OR LOWER(iv_details) LIKE '%" . $med_name_safe . "%'");
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $meds = json_decode($row['medicines'], true) ?: [];
             $changed_meds = false;
@@ -1923,12 +1924,14 @@ function backfill_historical_medicine_cost($conn, $med_name, $unit_cost, $old_un
             }
             
             // Check in injection_details
-            if (trim(strtolower($row['injection_details'] ?? '')) === trim(strtolower($med_name))) {
+            $inj_name_norm = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($row['injection_details'] ?? '')));
+            if ($inj_name_norm === $med_name_norm && $inj_name_norm !== '') {
                 $qty_difference += 1; // Injection is 1 unit
             }
             
             // Check in iv_details
-            if (trim(strtolower($row['iv_details'] ?? '')) === trim(strtolower($med_name))) {
+            $iv_name_norm = trim(str_ireplace([' (without brand)', ' (sold without brand)'], '', strtolower($row['iv_details'] ?? '')));
+            if ($iv_name_norm === $med_name_norm && $iv_name_norm !== '') {
                 $qty_difference += 1; // IV is 1 unit
             }
             
