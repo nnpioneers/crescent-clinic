@@ -2046,6 +2046,7 @@
                     let subtotal = medicines.reduce((s, m) => s + (parseFloat(m.amount) || 0), 0) + injCost + ivCost + uptCost;
                     const disc = parseFloat(r.discount_percent) || 0;
                     if (disc > 0) subtotal = subtotal - subtotal * (disc / 100);
+                    subtotal = Math.ceil(subtotal);
                     const statusBadge = r.status === 'completed'
                         ? '<span class="badge" style="background:var(--success-bg,#d1fae5);color:var(--success);">Paid</span>'
                         : '<span class="badge" style="background:#fff1f2;color:var(--danger);">Pending</span>';
@@ -2096,7 +2097,7 @@
             let medTotal = medicines.reduce((s, m) => s + (parseFloat(m.amount) || 0), 0);
             let subtotal = medTotal + injCost + ivCost + uptCost;
             let discAmt = subtotal * (disc / 100);
-            let grand = subtotal - discAmt;
+            let grand = Math.ceil(subtotal - discAmt);
 
             let medsHtml = '';
             if (medicines.length > 0) {
@@ -2178,7 +2179,7 @@
                     let trueMedTotal = parseFloat(sale.total_amount) || 0;
                     let trueSubtotal = trueMedTotal + injCost + ivCost + uptCost;
                     let trueDiscAmt = trueSubtotal * (disc / 100);
-                    let trueRetained = trueSubtotal - trueDiscAmt;
+                    let trueRetained = Math.ceil(trueSubtotal - trueDiscAmt);
                     renderReturnTimeline(div, returns, trueRetained, paidAmt);
                 }
             }).catch(e => { });
@@ -2405,6 +2406,7 @@
                     let subtotal = medicines.reduce((s, m) => s + (parseFloat(m.amount) || 0), 0) + injCost + ivCost + uptCost;
                     const disc = parseFloat(r.discount_percent) || 0;
                     if (disc > 0) subtotal = subtotal - subtotal * (disc / 100);
+                    subtotal = Math.ceil(subtotal);
 
                     return `
                         <tr>
@@ -3042,7 +3044,7 @@
                 grand = subtotal - (subtotal * (disc / 100));
             }
             
-            document.getElementById('editRecordGrandTotal').value = grand.toFixed(2);
+            document.getElementById('editRecordGrandTotal').value = Math.ceil(grand).toFixed(2);
             recalcEditPayments();
         }
         window.recalcEditTotal = recalcEditTotal;

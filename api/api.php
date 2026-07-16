@@ -3673,8 +3673,12 @@ if (preg_match('/^\/api\/whatsapp_link\/direct\/(\d+)$/', $uri, $matches)) {
     $iv_cost = (float)$rec['iv_cost'];
     $upt_cost = (float)$rec['upt_cost'];
     $paid_amount = (float)$rec['paid_amount'];
-    $balance_amount = (float)$rec['balance_amount'];
     $grand_total = $medicine_total + $injection_cost + $iv_cost + $upt_cost;
+    $discount_percent = (float)($rec['discount_percent'] ?? 0);
+    if ($discount_percent > 0) {
+        $grand_total -= $grand_total * ($discount_percent / 100);
+    }
+    $grand_total = ceil($grand_total);
 
     $status_text = ($balance_amount > 0) ? "🛑 *Pending Amount: ₹" . number_format($balance_amount, 2) . " to be paid later*" : (($paid_amount > $grand_total) ? "💰 *Return Amount: ₹" . number_format($paid_amount - $grand_total, 2) . "*" : "✅ *Payment Completed*");
 
@@ -3745,6 +3749,11 @@ if (preg_match('/^\/api\/whatsapp_link\/(\d+)$/', $uri, $matches)) {
     $paid_amount = (float)$rec['paid_amount'];
     $balance_amount = (float)$rec['balance_amount'];
     $grand_total = $medicine_total + $consultation_fee + $scan_fee + $injection_cost + $iv_cost + $upt_cost;
+    $discount_percent = (float)($rec['discount_percent'] ?? 0);
+    if ($discount_percent > 0) {
+        $grand_total -= $grand_total * ($discount_percent / 100);
+    }
+    $grand_total = ceil($grand_total);
 
     $status_text = ($balance_amount > 0) ? "🛑 *Pending Amount: ₹" . number_format($balance_amount, 2) . " to be paid later*" : (($paid_amount > $grand_total) ? "💰 *Return Amount: ₹" . number_format($paid_amount - $grand_total, 2) . "*" : "✅ *Payment Completed*");
 

@@ -87,7 +87,7 @@ function generate_prescription_pdf($presc_id) {
                pr.total_amount, pr.consultation_fee, pr.scan_fee, pr.doctor_name as presc_doctor,
                pr.cash_amount, pr.gpay_amount, pr.paid_amount, pr.balance_amount,
                pr.injection_details, pr.iv_details,
-               pr.injection_cost, pr.iv_cost, pr.upt_cost
+               pr.injection_cost, pr.iv_cost, pr.upt_cost, pr.discount_percent
         FROM prescriptions pr
         JOIN patients p ON pr.patient_id = p.id
         WHERE pr.id = ?");
@@ -188,7 +188,16 @@ function generate_prescription_pdf($presc_id) {
     $injection_cost = (float)$rec['injection_cost'];
     $iv_cost = (float)$rec['iv_cost'];
     $upt_cost = (float)$rec['upt_cost'];
-    $grand_total = $medicine_total + $consultation_fee + $scan_fee + $injection_cost + $iv_cost + $upt_cost;
+    $subtotal = $medicine_total + $consultation_fee + $scan_fee + $injection_cost + $iv_cost + $upt_cost;
+
+    $discount_percent = (float)($rec['discount_percent'] ?? 0);
+    $discount_amount = 0;
+    $grand_total = $subtotal;
+    if ($discount_percent > 0) {
+        $discount_amount = $subtotal * ($discount_percent / 100);
+        $grand_total -= $discount_amount;
+    }
+    $grand_total = ceil($grand_total);
 
     $pdf->PaymentRow('Doctor Fee:', $consultation_fee);
     $pdf->PaymentRow('Medicine Total:', $medicine_total);
@@ -196,6 +205,7 @@ function generate_prescription_pdf($presc_id) {
     if ($injection_cost > 0) $pdf->PaymentRow('Injection Fee:', $injection_cost);
     if ($iv_cost > 0) $pdf->PaymentRow('IV Fee:', $iv_cost);
     if ($upt_cost > 0) $pdf->PaymentRow('UPT Card Fee:', $upt_cost);
+    if ($discount_percent > 0) $pdf->PaymentRow("Discount ({$discount_percent}%):", -$discount_amount);
     
     $pdf->Ln(2);
     $pdf->Line(60, $pdf->GetY(), 200, $pdf->GetY());

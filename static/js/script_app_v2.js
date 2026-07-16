@@ -1897,7 +1897,7 @@ window.onunhandledrejection = function(event) {
         }
 
         const discountAmount = subtotalBill * (discountPercent / 100);
-        const totalBill = subtotalBill - discountAmount;
+        const totalBill = Math.ceil(subtotalBill - discountAmount);
 
         const cashAmount = parseFloat($('#payCashAmount').value) || 0;
         const gpayAmount = parseFloat($('#payGPayAmount').value) || 0;
@@ -2309,6 +2309,7 @@ window.onunhandledrejection = function(event) {
                 medsHtml += `<div class="total-row" style="font-size:0.9rem; padding: 8px 0; border: none; margin: 0; color: var(--danger);"><span>Discount (${discountPercent}%):</span><span>-₹${discountAmt.toFixed(2)}</span></div>`;
                 grandTotal -= discountAmt;
             }
+            grandTotal = Math.ceil(grandTotal);
 
             medsHtml += `<div class="total-row"><span>Grand Total:</span><span class="total-value">₹${grandTotal.toFixed(2)}</span></div>`;
 
