@@ -48,7 +48,11 @@ function get_db()
                 $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
                 $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
                 $conn->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, true);
-                $conn->exec("SET time_zone = '+05:30'");
+                try {
+                    $conn->exec("SET time_zone = '+05:30'");
+                } catch (PDOException $tz_e) {
+                    // Ignore timezone setting errors to prevent database connection failure
+                }
                 break;
             } catch (PDOException $e) {
                 if ($retry_count < $max_retries && (strpos($e->getMessage(), '2002') !== false || strpos($e->getMessage(), '1040') !== false || strpos($e->getMessage(), 'Operation not permitted') !== false)) {
