@@ -2858,10 +2858,14 @@
             
             // Hide/show doctor & clinical fields
             if (type === 'prescription') {
-                document.getElementById('editRecordTitle').textContent = `Edit Prescription Details (ID: #${record.presc_id})`;
+                document.getElementById('editRecordTitle').textContent = record.presc_id ? `Edit Prescription Details (ID: #${record.presc_id})` : `Edit Patient Details (ID: #${record.id})`;
                 document.getElementById('editRecordDoctorGroup').style.display = 'block';
                 document.getElementById('editRecordPrescriptionFields').style.display = 'block';
                 document.getElementById('editRecordConsultFeeGroup').style.display = 'block';
+                document.getElementById('editRecordTokenGroup').style.display = 'block';
+                document.getElementById('editRecordPatientIdGroup').style.display = 'block';
+                document.getElementById('editRecordAgeGroup').style.display = 'block';
+                document.getElementById('editRecordGenderGroup').style.display = 'block';
                 
                 // Populate doctor dropdown
                 const docSelect = document.getElementById('editRecordDoctor');
@@ -2869,6 +2873,11 @@
                     `<option value="${d.id}">${formatDoctorName(d.display_name, d.doctor_type)}</option>`
                 ).join('');
                 docSelect.value = record.doctor_id || '';
+                
+                document.getElementById('editRecordToken').value = record.token || '';
+                document.getElementById('editRecordPatientId').value = record.patient_id || '';
+                document.getElementById('editRecordAge').value = record.age || '';
+                document.getElementById('editRecordGender').value = record.gender || 'Male';
                 
                 document.getElementById('editRecordDiagnosis').value = record.diagnosis || '';
                 document.getElementById('editRecordPrescText').value = record.prescription_text || '';
@@ -2881,6 +2890,10 @@
                 document.getElementById('editRecordDoctorGroup').style.display = 'none';
                 document.getElementById('editRecordPrescriptionFields').style.display = 'none';
                 document.getElementById('editRecordConsultFeeGroup').style.display = 'none';
+                document.getElementById('editRecordTokenGroup').style.display = 'none';
+                document.getElementById('editRecordPatientIdGroup').style.display = 'none';
+                document.getElementById('editRecordAgeGroup').style.display = 'none';
+                document.getElementById('editRecordGenderGroup').style.display = 'none';
             }
             
             // Populate procedures
@@ -3143,6 +3156,10 @@
                 body.scan_fee = parseFloat(document.getElementById('editRecordScanFee').value) || 0;
                 body.scan_notes = document.getElementById('editRecordScanNotes').value.trim();
                 body.consultation_fee = parseFloat(document.getElementById('editRecordConsultFee').value) || 0;
+                body.token = document.getElementById('editRecordToken').value.trim();
+                body.patient_id_val = document.getElementById('editRecordPatientId').value.trim();
+                body.age = parseInt(document.getElementById('editRecordAge').value) || 0;
+                body.gender = document.getElementById('editRecordGender').value;
             }
             
             try {
@@ -5263,7 +5280,7 @@
                     <input type="hidden" id="editRecordId">
                     
                     <h4 style="margin-top: 0; margin-bottom: 15px; border-bottom: 2px solid var(--primary); padding-bottom: 6px; color: var(--primary);">Basic Information</h4>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 20px;">
                         <div class="form-group">
                             <label style="display:block; margin-bottom: 5px; font-weight: 600;">Customer/Patient Name</label>
                             <input type="text" id="editRecordName" required class="form-control" style="width: 100%; box-sizing: border-box;">
@@ -5271,6 +5288,26 @@
                         <div class="form-group">
                             <label style="display:block; margin-bottom: 5px; font-weight: 600;">Mobile Number</label>
                             <input type="text" id="editRecordPhone" class="form-control" style="width: 100%; box-sizing: border-box;">
+                        </div>
+                        <div class="form-group" id="editRecordTokenGroup">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">Token</label>
+                            <input type="text" id="editRecordToken" class="form-control" style="width: 100%; box-sizing: border-box;">
+                        </div>
+                        <div class="form-group" id="editRecordPatientIdGroup">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">Patient ID</label>
+                            <input type="text" id="editRecordPatientId" class="form-control" style="width: 100%; box-sizing: border-box;">
+                        </div>
+                        <div class="form-group" id="editRecordAgeGroup">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">Age</label>
+                            <input type="number" id="editRecordAge" class="form-control" style="width: 100%; box-sizing: border-box;">
+                        </div>
+                        <div class="form-group" id="editRecordGenderGroup">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">Gender</label>
+                            <select id="editRecordGender" class="form-control" style="width: 100%; box-sizing: border-box;">
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
+                            </select>
                         </div>
                         <div class="form-group" id="editRecordDoctorGroup">
                             <label style="display:block; margin-bottom: 5px; font-weight: 600;">Doctor</label>

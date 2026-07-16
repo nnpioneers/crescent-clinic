@@ -1089,7 +1089,7 @@ window.onunhandledrejection = function(event) {
 
     window.editPrescriptionRecord = function (prescId) {
         const list = window.currentPatients || [];
-        const record = list.find(p => p.presc_id == prescId);
+        const record = list.find(p => p.presc_id == prescId || p.id == prescId);
         if (record) {
             if (typeof openEditRecordModal === 'function') {
                 openEditRecordModal("prescription", record, record.phone, record.name);
@@ -3309,6 +3309,7 @@ window.onunhandledrejection = function(event) {
                                     <th>Age/Gender</th>
                                     <th>Phone</th>
                                     <th>Status</th>
+                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -3324,6 +3325,9 @@ window.onunhandledrejection = function(event) {
                         <td>${p.age} / ${p.gender}</td>
                         <td>${p.phone}</td>
                         <td><span class="badge ${statusClass}" style="text-transform: capitalize;">${displayStatus}</span></td>
+                        <td>
+                            <button class="btn btn-outline btn-sm" style="border-color: var(--emerald); color: var(--emerald);" onclick="editPrescriptionRecord(${p.presc_id || p.id})">Edit</button>
+                        </td>
                     </tr>`;
                 }).join('');
                 html += `

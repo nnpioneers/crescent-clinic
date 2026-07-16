@@ -240,6 +240,66 @@
         </main>
     </div>
 
+    <!-- Edit Details Modal for Receptionist -->
+    <div class="modal-overlay" id="editRecordModal">
+        <div class="modal" style="max-width: 600px; width: 95%;">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+                <h3 id="editRecordTitle" style="display: flex; align-items: center; gap: 8px;">
+                    Edit Patient Details
+                </h3>
+                <button class="modal-close" onclick="closeModal('editRecordModal')">✕</button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <form id="editRecordForm" onsubmit="saveEditedRecord(event)">
+                    <input type="hidden" id="editRecordType" value="prescription">
+                    <input type="hidden" id="editRecordId">
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+                        <div class="form-group" style="grid-column: span 2;">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">Patient Name</label>
+                            <input type="text" id="editRecordName" required class="form-control" style="width: 100%; box-sizing: border-box;">
+                        </div>
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">Mobile Number</label>
+                            <input type="text" id="editRecordPhone" class="form-control" style="width: 100%; box-sizing: border-box;">
+                        </div>
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">Token</label>
+                            <input type="text" id="editRecordToken" class="form-control" style="width: 100%; box-sizing: border-box;">
+                        </div>
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">Patient ID</label>
+                            <input type="text" id="editRecordPatientId" class="form-control" style="width: 100%; box-sizing: border-box;">
+                        </div>
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">Age</label>
+                            <input type="number" id="editRecordAge" class="form-control" style="width: 100%; box-sizing: border-box;">
+                        </div>
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">Gender</label>
+                            <select id="editRecordGender" class="form-control" style="width: 100%; box-sizing: border-box;">
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="grid-column: span 2;">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">Doctor</label>
+                            <select id="editRecordDoctor" class="form-control" style="width: 100%; box-sizing: border-box;">
+                                <!-- Doctor options injected dynamically -->
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="modal-footer" style="padding: 16px 0 0 0; text-align: right; border-top: 1px solid var(--border); margin-top: 20px;">
+                        <button type="button" class="btn btn-outline" onclick="closeModal('editRecordModal')">Cancel</button>
+                        <button type="submit" class="btn btn-primary" style="margin-left: 10px;">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <div class="toast-container" id="toastContainer"></div>
     <script>
         // PAGE-SPECIFIC FIX: Force layout stability on initial load
@@ -256,6 +316,91 @@
         window.onunhandledrejection = function(event) {
             console.error('Unhandled Promise Rejection:', event.reason);
         };
+
+        // Doctor formatting helper
+        function formatDoctorName(name, type) {
+            if (!name) return name;
+            const suffix = (type && type.toLowerCase().includes('gents')) ? ' (Sir)' : ' (Madam)';
+            if (name.includes('(Sir)') || name.includes('(Madam)')) return name;
+            return name + suffix;
+        }
+
+        // Modal triggers
+        function openModal(id) {
+            const modal = document.getElementById(id);
+            if (modal) modal.classList.add('active');
+        }
+        function closeModal(id) {
+            const modal = document.getElementById(id);
+            if (modal) modal.classList.remove('active');
+        }
+        window.openModal = openModal;
+        window.closeModal = closeModal;
+
+        async function openEditRecordModal(type, record, phone = '', name = '') {
+            document.getElementById('editRecordType').value = type;
+            document.getElementById('editRecordId').value = record.id;
+            document.getElementById('editRecordName').value = name || record.name || '';
+            document.getElementById('editRecordPhone').value = phone || record.phone || '';
+            document.getElementById('editRecordToken').value = record.token || '';
+            document.getElementById('editRecordPatientId').value = record.patient_id || '';
+            document.getElementById('editRecordAge').value = record.age || '';
+            document.getElementById('editRecordGender').value = record.gender || 'Male';
+
+            // Populate doctors select dropdown dynamically
+            let doctors = window.allDoctors || [];
+            if (doctors.length === 0) {
+                try {
+                    doctors = await api('/api/doctors') || [];
+                    window.allDoctors = doctors;
+                } catch (e) {
+                    console.error("Failed to fetch doctors in modal", e);
+                }
+            }
+            const docSelect = document.getElementById('editRecordDoctor');
+            docSelect.innerHTML = `<option value="">Select Doctor</option>` + doctors.map(d => 
+                `<option value="${d.id}">${formatDoctorName(d.display_name, d.doctor_type)}</option>`
+            ).join('');
+            docSelect.value = record.doctor_id || '';
+
+            openModal('editRecordModal');
+        }
+        window.openEditRecordModal = openEditRecordModal;
+
+        async function saveEditedRecord(event) {
+            event.preventDefault();
+            const id = document.getElementById('editRecordId').value;
+            const body = {
+                type: 'prescription',
+                id: id,
+                customer_name: document.getElementById('editRecordName').value.trim(),
+                mobile_number: document.getElementById('editRecordPhone').value.trim(),
+                token: document.getElementById('editRecordToken').value.trim(),
+                patient_id_val: document.getElementById('editRecordPatientId').value.trim(),
+                age: parseInt(document.getElementById('editRecordAge').value) || 0,
+                gender: document.getElementById('editRecordGender').value,
+                doctor_id: document.getElementById('editRecordDoctor').value
+            };
+
+            try {
+                const res = await api('/api/management/edit_record', {
+                    method: 'POST',
+                    body: body
+                });
+                if (res.success) {
+                    toast('Patient details updated successfully!', 'success');
+                    closeModal('editRecordModal');
+                    if (typeof window.loadPatients === 'function') {
+                        window.loadPatients();
+                    }
+                } else {
+                    toast(res.error || 'Failed to save changes', 'error');
+                }
+            } catch (e) {
+                toast(e.message || 'Operation failed', 'error');
+            }
+        }
+        window.saveEditedRecord = saveEditedRecord;
     </script>
     <script src="{{ url_for('static', filename='js/script_app_v2.js') }}?v=202607111"></script>
 </body>

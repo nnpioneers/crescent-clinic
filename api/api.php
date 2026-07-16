@@ -1599,7 +1599,7 @@ if ($uri === '/api/direct_sales/update_customer' && $method === 'POST') {
 }
 
 if ($uri === '/api/management/edit_record' && $method === 'POST') {
-    enforce_api_auth(['pharmacist']);
+    enforce_api_auth(['pharmacist', 'receptionist']);
     $conn = get_db();
     
     $type = $input['type'] ?? '';
@@ -1640,21 +1640,66 @@ if ($uri === '/api/management/edit_record' && $method === 'POST') {
         $new_medicines = $input['medicines'] ?? [];
         
         // 1. Fetch old record
+        $old_record = null;
+        $patient_record = null;
+        $has_prescription = false;
+        $presc_id = null;
+        $patient_id = null;
+        
         if ($type === 'prescription') {
+            // First try matching prescriptions.id
             $stmt = $conn->prepare("SELECT * FROM prescriptions WHERE id=?");
             $stmt->execute([$id]);
             $old_record = $stmt->fetch();
+            
+            if ($old_record) {
+                $has_prescription = true;
+                $presc_id = $old_record['id'];
+                $patient_id = (int)$old_record['patient_id'];
+                
+                // Get patient record
+                $stmt_p = $conn->prepare("SELECT * FROM patients WHERE id=?");
+                $stmt_p->execute([$patient_id]);
+                $patient_record = $stmt_p->fetch();
+            } else {
+                // Try matching prescriptions.patient_id = $id (in case $id was patient_id)
+                $stmt = $conn->prepare("SELECT * FROM prescriptions WHERE patient_id=?");
+                $stmt->execute([$id]);
+                $old_record = $stmt->fetch();
+                
+                if ($old_record) {
+                    $has_prescription = true;
+                    $presc_id = $old_record['id'];
+                    $patient_id = (int)$old_record['patient_id'];
+                    
+                    $stmt_p = $conn->prepare("SELECT * FROM patients WHERE id=?");
+                    $stmt_p->execute([$patient_id]);
+                    $patient_record = $stmt_p->fetch();
+                } else {
+                    // Patient exists but has no prescription yet (waiting status)
+                    $patient_id = $id;
+                    $stmt_p = $conn->prepare("SELECT * FROM patients WHERE id=?");
+                    $stmt_p->execute([$patient_id]);
+                    $patient_record = $stmt_p->fetch();
+                }
+            }
+            
+            if (!$patient_record) {
+                throw new Exception("Patient record not found");
+            }
         } else {
             $stmt = $conn->prepare("SELECT * FROM direct_sales WHERE id=?");
             $stmt->execute([$id]);
             $old_record = $stmt->fetch();
+            if (!$old_record) {
+                throw new Exception("Direct sale record not found");
+            }
         }
-        
-        if (!$old_record) {
-            throw new Exception("Record not found");
-        }
-        
-        $old_medicines = json_decode($old_record['medicines'] ?: '[]', true) ?: [];
+        $total_med_amount = 0.0;
+        $total_cost = 0.0;
+
+        if ($type === 'direct_sale' || $has_prescription) {
+            $old_medicines = json_decode($old_record['medicines'] ?: '[]', true) ?: [];
         
         // 2. Restore stock for old medicines (accounting for returns)
         foreach ($old_medicines as $m) {
@@ -1844,18 +1889,20 @@ if ($uri === '/api/management/edit_record' && $method === 'POST') {
                 sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
             }
         }
-        
-        // 6. Update database record
+    }
+
+    // 6. Update database record
         if ($type === 'prescription') {
-            // Update patient name and phone
-            $patient_id = (int)$old_record['patient_id'];
-            $stmt_pat = $conn->prepare("UPDATE patients SET name=?, phone=? WHERE id=?");
-            $stmt_pat->execute([$customer_name, $mobile_number, $patient_id]);
+            // Update patient details (name, phone, token, patient_id, age, gender, doctor_id, doctor_name, doctor_type)
+            $token = trim($input['token'] ?? ($patient_record ? $patient_record['token'] : ''));
+            $patient_id_val = trim($input['patient_id_val'] ?? ($patient_record ? $patient_record['patient_id'] : ''));
+            $age = (int)($input['age'] ?? ($patient_record ? $patient_record['age'] : 0));
+            $gender = trim($input['gender'] ?? ($patient_record ? $patient_record['gender'] : 'Male'));
             
             // Get doctor details
-            $doctor_id = (int)($input['doctor_id'] ?? $old_record['doctor_id']);
-            $doctor_name = $old_record['doctor_name'];
-            $doctor_type = $old_record['doctor_type'];
+            $doctor_id = (int)($input['doctor_id'] ?? ($patient_record ? $patient_record['doctor_id'] : 0));
+            $doctor_name = $patient_record ? $patient_record['doctor_name'] : '';
+            $doctor_type = $patient_record ? $patient_record['doctor_type'] : '';
             if ($doctor_id > 0) {
                 $stmt_doc = $conn->prepare("SELECT display_name, doctor_type FROM users WHERE id=?");
                 $stmt_doc->execute([$doctor_id]);
@@ -1866,20 +1913,25 @@ if ($uri === '/api/management/edit_record' && $method === 'POST') {
                 }
             }
             
-            // Save prescription record
-            $stmt = $conn->prepare("UPDATE prescriptions SET 
-                doctor_id=?, doctor_name=?, doctor_type=?, consultation_fee=?, diagnosis=?, prescription_text=?, medicines=?,
-                total_amount=?, cost_amount=?, scan_fee=?, scan_type=?, scan_notes=?, injection_cost=?, injection_details=?,
-                iv_cost=?, upt_cost=?, cash_amount=?, gpay_amount=?, phonepe_amount=?, bank_amount=?, paid_amount=?,
-                balance_amount=?, discount_percent=?, upi_account=? 
-                WHERE id=?");
-            $stmt->execute([
-                $doctor_id, $doctor_name, $doctor_type, $consultation_fee, $input['diagnosis'] ?? $old_record['diagnosis'],
-                $input['prescription_text'] ?? $old_record['prescription_text'], json_encode($new_medicines),
-                $total_med_amount, $total_cost, $scan_fee, $scan_type, $scan_notes, $injection_cost, $injection_details,
-                $iv_cost, $upt_cost, $cash_amount, $gpay_amount, $phonepe_amount, $bank_amount, $paid_amount,
-                $balance_amount, $discount_percent, $upi_account, $id
-            ]);
+            $stmt_pat = $conn->prepare("UPDATE patients SET name=?, phone=?, token=?, patient_id=?, age=?, gender=?, doctor_id=?, doctor_name=?, doctor_type=? WHERE id=?");
+            $stmt_pat->execute([$customer_name, $mobile_number, $token, $patient_id_val, $age, $gender, $doctor_id, $doctor_name, $doctor_type, $patient_id]);
+            
+            if ($has_prescription) {
+                // Save prescription record
+                $stmt = $conn->prepare("UPDATE prescriptions SET 
+                    doctor_id=?, doctor_name=?, doctor_type=?, consultation_fee=?, diagnosis=?, prescription_text=?, medicines=?,
+                    total_amount=?, cost_amount=?, scan_fee=?, scan_type=?, scan_notes=?, injection_cost=?, injection_details=?,
+                    iv_cost=?, upt_cost=?, cash_amount=?, gpay_amount=?, phonepe_amount=?, bank_amount=?, paid_amount=?,
+                    balance_amount=?, discount_percent=?, upi_account=? 
+                    WHERE id=?");
+                $stmt->execute([
+                    $doctor_id, $doctor_name, $doctor_type, $consultation_fee, $input['diagnosis'] ?? ($old_record ? $old_record['diagnosis'] : ''),
+                    $input['prescription_text'] ?? ($old_record ? $old_record['prescription_text'] : ''), json_encode($new_medicines),
+                    $total_med_amount, $total_cost, $scan_fee, $scan_type, $scan_notes, $injection_cost, $injection_details,
+                    $iv_cost, $upt_cost, $cash_amount, $gpay_amount, $phonepe_amount, $bank_amount, $paid_amount,
+                    $balance_amount, $discount_percent, $upi_account, $presc_id
+                ]);
+            }
             
         } else {
             // Update direct sale
