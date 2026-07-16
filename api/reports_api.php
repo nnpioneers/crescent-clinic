@@ -185,7 +185,42 @@ if ($action === 'get_reports') {
     // Net Profit
     $med_cost = (float)($pr['med_cost'] ?? 0);
     $direct_cost = (float)($ds['direct_cost'] ?? 0);
+
+    // LIVE COST FALLBACK: If cost_amount was never saved (purchase_price=0 when dispensed),
+    // compute live cost from current inventory purchase prices
+    if ($med_cost == 0) {
+        $live_cost_stmt = $conn->query("SELECT id, medicines FROM prescriptions WHERE status='dispensed' AND $date_filter_patients");
+        $inv_price_cache = [];
+        foreach ($live_cost_stmt->fetchAll(PDO::FETCH_ASSOC) as $lp) {
+            $meds = json_decode($lp['medicines'] ?: '[]', true);
+            foreach ($meds as $lm) {
+                $lname = trim($lm['name'] ?? '');
+                if (!$lname || in_array($lname, ['Injection Fee','IV Fluid Fee','UPT Card Fee'])) continue;
+                $lqty = (float)($lm['qty'] ?? 0) - (float)($lm['returned_qty'] ?? 0);
+                if ($lqty <= 0) continue;
+                $batch_id = $lm['batch_id'] ?? null;
+                if ($batch_id && !isset($inv_price_cache['b'.$batch_id])) {
+                    $s = $conn->prepare("SELECT purchase_price, tablets_per_strip FROM inventory WHERE id=?");
+                    $s->execute([$batch_id]);
+                    $inv_price_cache['b'.$batch_id] = $s->fetch() ?: ['purchase_price'=>0,'tablets_per_strip'=>1];
+                }
+                $irow = $batch_id ? ($inv_price_cache['b'.$batch_id] ?? null) : null;
+                if (!$irow) {
+                    if (!isset($inv_price_cache[$lname])) {
+                        $s = $conn->prepare("SELECT purchase_price, tablets_per_strip FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
+                        $s->execute([$lname]);
+                        $inv_price_cache[$lname] = $s->fetch() ?: ['purchase_price'=>0,'tablets_per_strip'=>1];
+                    }
+                    $irow = $inv_price_cache[$lname];
+                }
+                $tps = max(1, (int)($irow['tablets_per_strip'] ?? 1));
+                $med_cost += ((float)$irow['purchase_price'] / $tps) * $lqty;
+            }
+        }
+    }
+
     $net_profit = $total_revenue - ($med_cost + $direct_cost);
+
 
     // Inventory Value
     $stmt = $conn->query("SELECT COUNT(*) as count, SUM(stock * purchase_price) as inventory_value FROM inventory WHERE stock > 0");
@@ -665,7 +700,41 @@ if ($action === 'get_print_report') {
     // Net Profit - MUST USE THE FORMULA: Total Revenue - (Medicine Cost + Direct Sale Cost)
     $med_cost = (float)($pr['med_cost'] ?? 0);
     $direct_cost = (float)($ds['direct_cost'] ?? 0);
+
+    // LIVE COST FALLBACK: If cost_amount was 0 (purchase_price not set when dispensed)
+    if ($med_cost == 0) {
+        $live_cost_stmt2 = $conn->query("SELECT id, medicines FROM prescriptions WHERE status='dispensed' AND $date_filter_patients");
+        $inv_price_cache2 = [];
+        foreach ($live_cost_stmt2->fetchAll(PDO::FETCH_ASSOC) as $lp) {
+            $meds = json_decode($lp['medicines'] ?: '[]', true);
+            foreach ($meds as $lm) {
+                $lname = trim($lm['name'] ?? '');
+                if (!$lname || in_array($lname, ['Injection Fee','IV Fluid Fee','UPT Card Fee'])) continue;
+                $lqty = (float)($lm['qty'] ?? 0) - (float)($lm['returned_qty'] ?? 0);
+                if ($lqty <= 0) continue;
+                $bid = $lm['batch_id'] ?? null;
+                if ($bid && !isset($inv_price_cache2['b'.$bid])) {
+                    $s = $conn->prepare("SELECT purchase_price, tablets_per_strip FROM inventory WHERE id=?");
+                    $s->execute([$bid]);
+                    $inv_price_cache2['b'.$bid] = $s->fetch() ?: ['purchase_price'=>0,'tablets_per_strip'=>1];
+                }
+                $irow = $bid ? ($inv_price_cache2['b'.$bid] ?? null) : null;
+                if (!$irow) {
+                    if (!isset($inv_price_cache2[$lname])) {
+                        $s = $conn->prepare("SELECT purchase_price, tablets_per_strip FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
+                        $s->execute([$lname]);
+                        $inv_price_cache2[$lname] = $s->fetch() ?: ['purchase_price'=>0,'tablets_per_strip'=>1];
+                    }
+                    $irow = $inv_price_cache2[$lname];
+                }
+                $tps = max(1, (int)($irow['tablets_per_strip'] ?? 1));
+                $med_cost += ((float)$irow['purchase_price'] / $tps) * $lqty;
+            }
+        }
+    }
+
     $net_profit = $total_revenue - ($med_cost + $direct_cost);
+
 
     $pending_amount = (float)($pr['pending'] ?? 0) + (float)($ds['ds_pending'] ?? 0);
     $collection_amount = (float)($pr['paid'] ?? 0) + (float)($ds['ds_paid'] ?? 0);

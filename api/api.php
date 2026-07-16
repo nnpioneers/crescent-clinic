@@ -3558,6 +3558,21 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
     // Recalculate total_profit using dynamic medicine_cost (computed after $true_med_cost is ready)
     $total_profit = $total_income - ($medicine_cost + $ds_cost);
 
+    // REALIZED PROFIT CORRECTION: If DB cost_amount was 0 (purchase_price not configured),
+    // fallback to live inventory cost proportionally scaled to payment ratio
+    if ($realized_rx_cost == 0 && $medicine_cost > 0 && ($rx_paid + $rx_balance) > 0) {
+        $realized_rx_cost   = $medicine_cost * ($rx_paid / ($rx_paid + $rx_balance));
+        $realized_rx_profit = $rx_paid - $realized_rx_cost;
+        $realized_profit    = $realized_rx_profit + $realized_ds_profit;
+    }
+    if ($realized_ds_profit == $ds_paid && $ds_cost > 0 && ($ds_paid + $ds_balance_amt) > 0) {
+        // ds cost_amount was also 0; recalculate
+        $ds_realized_cost   = $ds_cost * ($ds_paid / ($ds_paid + $ds_balance_amt));
+        $realized_ds_profit = $ds_paid - $ds_realized_cost;
+        $realized_profit    = $realized_rx_profit + $realized_ds_profit;
+    }
+
+
     // Fetch individual scan records for details modal
     $pr_date_filter = str_replace('created_at', 'pr.created_at', $date_filter);
     $pr_doc_filter = str_replace('doctor_type', 'pr.doctor_type', $doc_filter);
