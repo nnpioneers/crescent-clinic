@@ -49,6 +49,20 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
+
+        /* Override medicine-row grid display for modal table rows */
+        tr.medicine-row {
+            display: table-row !important;
+        }
+        tr.medicine-row td {
+            display: table-cell !important;
+        }
+        tr.medicine-row input.form-control {
+            padding: 8px 12px !important;
+            border-radius: 6px !important;
+            font-size: 0.88rem !important;
+            height: auto !important;
+        }
     </style>
 <meta name="csrf-token" content="{{ csrf_token }}">
 </head>
