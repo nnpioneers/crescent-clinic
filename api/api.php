@@ -1598,6 +1598,312 @@ if ($uri === '/api/direct_sales/update_customer' && $method === 'POST') {
     json_response(['success' => true]);
 }
 
+if ($uri === '/api/management/edit_record' && $method === 'POST') {
+    enforce_api_auth(['pharmacist']);
+    $conn = get_db();
+    
+    $type = $input['type'] ?? '';
+    $id = (int)($input['id'] ?? 0);
+    
+    if (!$id || !$type) {
+        json_response(['success' => false, 'error' => 'ID and Type are required'], 400);
+    }
+    
+    try {
+        $conn->beginTransaction();
+        
+        $customer_name = trim($input['customer_name'] ?? '');
+        $mobile_number = trim($input['mobile_number'] ?? '');
+        
+        $consultation_fee = (float)($input['consultation_fee'] ?? 0);
+        $scan_fee = (float)($input['scan_fee'] ?? 0);
+        $scan_type = $input['scan_type'] ?? null;
+        $scan_notes = $input['scan_notes'] ?? null;
+        
+        $injection_cost = (float)($input['injection_cost'] ?? 0);
+        $injection_details = $input['injection_details'] ?? null;
+        $iv_cost = (float)($input['iv_cost'] ?? 0);
+        $iv_details = $input['iv_details'] ?? null;
+        $upt_cost = (float)($input['upt_cost'] ?? 0);
+        $upt_card = (int)($input['upt_card'] ?? 0);
+        
+        $discount_percent = (float)($input['discount_percent'] ?? 0);
+        $cash_amount = (float)($input['cash_amount'] ?? 0);
+        $gpay_amount = (float)($input['gpay_amount'] ?? 0);
+        $phonepe_amount = (float)($input['phonepe_amount'] ?? 0);
+        $bank_amount = (float)($input['bank_amount'] ?? 0);
+        
+        $paid_amount = (float)($input['paid_amount'] ?? 0);
+        $balance_amount = (float)($input['balance_amount'] ?? 0);
+        $upi_account = $input['upi_account'] ?? null;
+        
+        $new_medicines = $input['medicines'] ?? [];
+        
+        // 1. Fetch old record
+        if ($type === 'prescription') {
+            $stmt = $conn->prepare("SELECT * FROM prescriptions WHERE id=?");
+            $stmt->execute([$id]);
+            $old_record = $stmt->fetch();
+        } else {
+            $stmt = $conn->prepare("SELECT * FROM direct_sales WHERE id=?");
+            $stmt->execute([$id]);
+            $old_record = $stmt->fetch();
+        }
+        
+        if (!$old_record) {
+            throw new Exception("Record not found");
+        }
+        
+        $old_medicines = json_decode($old_record['medicines'] ?: '[]', true) ?: [];
+        
+        // 2. Restore stock for old medicines (accounting for returns)
+        foreach ($old_medicines as $m) {
+            $qty = (int)($m['qty'] ?? 0);
+            $ret_qty = (int)($m['returned_qty'] ?? 0);
+            $restore_qty = max(0, $qty - $ret_qty);
+            $batch_id = $m['batch_id'] ?? '';
+            $name = $m['name'] ?? '';
+            
+            if ($restore_qty <= 0) continue;
+            
+            if ($batch_id) {
+                $conn->prepare("UPDATE inventory SET stock = stock + ? WHERE id=?")->execute([$restore_qty, $batch_id]);
+                $inv = $conn->prepare("SELECT name, batch_number FROM inventory WHERE id=?");
+                $inv->execute([$batch_id]);
+                $row = $inv->fetch();
+                if ($row) sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
+            } elseif ($name) {
+                $stmt2 = $conn->prepare("SELECT id, name, batch_number FROM inventory WHERE name=? ORDER BY id LIMIT 1");
+                $stmt2->execute([$name]);
+                $row = $stmt2->fetch();
+                if ($row) {
+                    $conn->prepare("UPDATE inventory SET stock = stock + ? WHERE id=?")->execute([$restore_qty, $row['id']]);
+                    sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
+                }
+            }
+        }
+        
+        // 3. Restore stock for old UPT card, injection, and IV
+        if ((float)($old_record['upt_cost'] ?? 0) > 0 || (int)($old_record['upt_card'] ?? 0) === 1) {
+            $stmt = $conn->query("SELECT id, name, batch_number FROM inventory WHERE category='UPT Card' ORDER BY id LIMIT 1");
+            $row = $stmt->fetch();
+            if ($row) {
+                $conn->prepare("UPDATE inventory SET stock = stock + 1 WHERE id=?")->execute([$row['id']]);
+                sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
+            }
+        }
+        if ((float)($old_record['injection_cost'] ?? 0) > 0 && ($old_record['injection_details'] ?? '')) {
+            $item_name = trim($old_record['injection_details']);
+            $stmt = $conn->prepare("SELECT id, name, batch_number FROM inventory WHERE name=? ORDER BY id LIMIT 1");
+            $stmt->execute([$item_name]);
+            $row = $stmt->fetch();
+            if ($row) {
+                $conn->prepare("UPDATE inventory SET stock = stock + 1 WHERE id=?")->execute([$row['id']]);
+                sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
+            }
+        }
+        if ((float)($old_record['iv_cost'] ?? 0) > 0 && ($old_record['iv_details'] ?? '')) {
+            $item_name = trim($old_record['iv_details']);
+            $stmt = $conn->prepare("SELECT id, name, batch_number FROM inventory WHERE name=? ORDER BY id LIMIT 1");
+            $stmt->execute([$item_name]);
+            $row = $stmt->fetch();
+            if ($row) {
+                $conn->prepare("UPDATE inventory SET stock = stock + 1 WHERE id=?")->execute([$row['id']]);
+                sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
+            }
+        }
+        
+        // 4. Deduct stock for new medicines
+        $total_med_amount = 0.0;
+        $total_cost = 0.0;
+        
+        foreach ($new_medicines as &$m) {
+            $name = $m['name'] ?? null;
+            $qty = (int)($m['qty'] ?? 0);
+            $batch_id = $m['batch_id'] ?? '';
+            $tps_input = max(1, (int)($m['tps'] ?? 1));
+            $unit_price_input = (float)($m['unit_price'] ?? 0);
+            $m_cost = 0.0;
+            $rev = (float)($m['amount'] ?? 0);
+            $total_med_amount += $rev;
+            
+            if ($name && $qty > 0) {
+                if ($batch_id) {
+                    $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, tablets_per_strip, mrp, selling_price FROM inventory WHERE id=?");
+                    $stmt->execute([$batch_id]);
+                    $row = $stmt->fetch();
+                    if ($row) {
+                        $tps = max(1, (int)($row['tablets_per_strip'] ?? 1));
+                        $cost_per_unit = (float)$row['purchase_price'] / $tps;
+                        $m_cost = $cost_per_unit * $qty;
+                        $total_cost += $m_cost;
+                        $conn->prepare("UPDATE inventory SET stock = stock - ? WHERE id=?")->execute([$qty, $batch_id]);
+                        sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
+                    }
+                } else {
+                    ensure_synthesized_inventory($conn, $name);
+                    $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, tablets_per_strip, id, mrp, selling_price FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
+                    $stmt->execute([$name]);
+                    $row = $stmt->fetch();
+                    if (!$row && stripos(trim($name), '(Without Brand)') === false) {
+                        $check_name = trim($name) . ' (Without Brand)';
+                        $stmt->execute([$check_name]);
+                        $row = $stmt->fetch();
+                    }
+                    if ($row) {
+                        $tps = max(1, (int)($row['tablets_per_strip'] ?? 1));
+                        $cost_per_unit = (float)$row['purchase_price'] / $tps;
+                        $m_cost = $cost_per_unit * $qty;
+                        $total_cost += $m_cost;
+                        $conn->prepare("UPDATE inventory SET stock = stock - ? WHERE id=?")->execute([$qty, $row['id']]);
+                        sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
+                        $m['batch_id'] = $row['id'];
+                        $m['tps'] = $tps;
+                    } else {
+                        $batch = 'manual_default';
+                        $tps = $tps_input;
+                        $mrp = $unit_price_input * $tps;
+                        $cat = 'Tablet';
+                        $new_name = trim($name);
+                        if (stripos($new_name, '(Without Brand)') === false) {
+                            $new_name .= ' (Without Brand)';
+                        }
+                        $orig_name = trim($name);
+                        $stmt_ins = $conn->prepare("INSERT INTO inventory (name, generic_name, mrp, selling_price, purchase_price, stock, category, batch_number, tablets_per_strip) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?)");
+                        $stmt_ins->execute([$new_name, $orig_name, $mrp, $mrp, -$qty, $cat, $batch, $tps]);
+                        $new_id = $conn->lastInsertId();
+                        
+                        $stmt_ai = $conn->prepare("INSERT IGNORE INTO agency_items (item_name, generic_name, mrp, selling_price, purchase_price, stock, batch_number) VALUES (?, ?, ?, ?, 0, ?, ?)");
+                        $stmt_ai->execute([$new_name, $orig_name, $mrp, $mrp, -$qty, $batch]);
+                        
+                        sync_stock_item($conn, $new_name, $batch, 'pharmacy');
+                        
+                        $m['batch_id'] = $new_id;
+                        $m['tps'] = $tps;
+                    }
+                }
+            }
+            $m['cost'] = $m_cost;
+            $m['revenue'] = $rev;
+            $m['profit'] = $rev - $m_cost;
+        }
+        unset($m);
+        
+        // 5. Deduct stock for new injection, IV, and UPT card
+        $deduct_stock_by_name = function($item_name, $category, $cost = 0) use ($conn, &$total_cost) {
+            if (!$item_name || trim($item_name) === '') return;
+            if (trim($category) === 'Injection') $category = 'INJ';
+            ensure_synthesized_inventory($conn, $item_name);
+            $stmt = $conn->prepare("SELECT name, batch_number, purchase_price, id, mrp, selling_price FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
+            $stmt->execute([trim($item_name)]);
+            $row = $stmt->fetch();
+            if (!$row && stripos(trim($item_name), '(Without Brand)') === false) {
+                $check_name = trim($item_name) . ' (Without Brand)';
+                $stmt->execute([$check_name]);
+                $row = $stmt->fetch();
+            }
+            if ($row) {
+                if ($cost > 0 && ((float)$row['mrp'] <= 0 || (float)$row['selling_price'] <= 0)) {
+                    $conn->prepare("UPDATE inventory SET mrp=?, selling_price=? WHERE id=?")->execute([$cost, $cost, $row['id']]);
+                }
+                $total_cost += (float)$row['purchase_price'];
+                $stmt = $conn->prepare("UPDATE inventory SET stock = stock - 1 WHERE id=?");
+                $stmt->execute([$row['id']]);
+                sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
+            } else {
+                $batch = 'manual_default';
+                $new_item_name = trim($item_name);
+                if (stripos($new_item_name, '(Without Brand)') === false) {
+                    $new_item_name .= ' (Without Brand)';
+                }
+                $orig_item_name = trim($item_name);
+                $mrp = $cost > 0 ? $cost : 0;
+                $stmt_ins = $conn->prepare("INSERT INTO inventory (name, generic_name, mrp, selling_price, purchase_price, stock, category, batch_number, tablets_per_strip) VALUES (?, ?, ?, ?, 0, -1, ?, ?, 1)");
+                $stmt_ins->execute([$new_item_name, $orig_item_name, $mrp, $mrp, $category, $batch]);
+                
+                $stmt_ai = $conn->prepare("INSERT IGNORE INTO agency_items (item_name, generic_name, mrp, selling_price, purchase_price, stock, batch_number) VALUES (?, ?, ?, ?, 0, -1, ?)");
+                $stmt_ai->execute([$new_item_name, $orig_item_name, $mrp, $mrp, $batch]);
+                
+                sync_stock_item($conn, $new_item_name, $batch, 'pharmacy');
+            }
+        };
+        
+        if ($injection_cost > 0 && $injection_details) {
+            $deduct_stock_by_name($injection_details, 'INJ', $injection_cost);
+        }
+        if ($iv_cost > 0 && $iv_details) {
+            $deduct_stock_by_name($iv_details, 'IV Fluids', $iv_cost);
+        }
+        if ($upt_cost > 0) {
+            $stmt = $conn->query("SELECT name, batch_number, purchase_price, id FROM inventory WHERE category='UPT Card' ORDER BY expiry_date ASC LIMIT 1");
+            $row = $stmt->fetch();
+            if ($row) {
+                $total_cost += (float)$row['purchase_price'];
+                $stmt = $conn->prepare("UPDATE inventory SET stock = stock - 1 WHERE id=?");
+                $stmt->execute([$row['id']]);
+                sync_stock_item($conn, $row['name'], $row['batch_number'], 'pharmacy');
+            }
+        }
+        
+        // 6. Update database record
+        if ($type === 'prescription') {
+            // Update patient name and phone
+            $patient_id = (int)$old_record['patient_id'];
+            $stmt_pat = $conn->prepare("UPDATE patients SET name=?, phone=? WHERE id=?");
+            $stmt_pat->execute([$customer_name, $mobile_number, $patient_id]);
+            
+            // Get doctor details
+            $doctor_id = (int)($input['doctor_id'] ?? $old_record['doctor_id']);
+            $doctor_name = $old_record['doctor_name'];
+            $doctor_type = $old_record['doctor_type'];
+            if ($doctor_id > 0) {
+                $stmt_doc = $conn->prepare("SELECT display_name, doctor_type FROM users WHERE id=?");
+                $stmt_doc->execute([$doctor_id]);
+                $doc = $stmt_doc->fetch();
+                if ($doc) {
+                    $doctor_name = $doc['display_name'];
+                    $doctor_type = $doc['doctor_type'];
+                }
+            }
+            
+            // Save prescription record
+            $stmt = $conn->prepare("UPDATE prescriptions SET 
+                doctor_id=?, doctor_name=?, doctor_type=?, consultation_fee=?, diagnosis=?, prescription_text=?, medicines=?,
+                total_amount=?, cost_amount=?, scan_fee=?, scan_type=?, scan_notes=?, injection_cost=?, injection_details=?,
+                iv_cost=?, upt_cost=?, cash_amount=?, gpay_amount=?, phonepe_amount=?, bank_amount=?, paid_amount=?,
+                balance_amount=?, discount_percent=?, upi_account=? 
+                WHERE id=?");
+            $stmt->execute([
+                $doctor_id, $doctor_name, $doctor_type, $consultation_fee, $input['diagnosis'] ?? $old_record['diagnosis'],
+                $input['prescription_text'] ?? $old_record['prescription_text'], json_encode($new_medicines),
+                $total_med_amount, $total_cost, $scan_fee, $scan_type, $scan_notes, $injection_cost, $injection_details,
+                $iv_cost, $upt_cost, $cash_amount, $gpay_amount, $phonepe_amount, $bank_amount, $paid_amount,
+                $balance_amount, $discount_percent, $upi_account, $id
+            ]);
+            
+        } else {
+            // Update direct sale
+            $stmt = $conn->prepare("UPDATE direct_sales SET 
+                customer_name=?, mobile_number=?, medicines=?, injection_details=?, iv_details=?, injection_cost=?,
+                iv_cost=?, upt_card=?, upt_cost=?, total_amount=?, discount_percent=?, cash_amount=?, gpay_amount=?,
+                paid_amount=?, balance_amount=?, cost_amount=?, phonepe_amount=?, bank_amount=?, upi_account=?
+                WHERE id=?");
+            $stmt->execute([
+                $customer_name, $mobile_number, json_encode($new_medicines), $injection_details, $iv_details, $injection_cost,
+                $iv_cost, $upt_card, $upt_cost, $total_med_amount, $discount_percent, $cash_amount, $gpay_amount,
+                $paid_amount, $balance_amount, $total_cost, $phonepe_amount, $bank_amount, $upi_account, $id
+            ]);
+        }
+        
+        $conn->commit();
+        json_response(['success' => true]);
+        
+    } catch (Exception $e) {
+        if ($conn->inTransaction()) $conn->rollBack();
+        json_response(['success' => false, 'error' => $e->getMessage()], 400);
+    }
+}
+
 // ═══════════════════════════════════════════
 // API — INVENTORY
 // ═══════════════════════════════════════════

@@ -2403,6 +2403,7 @@
                             <td><span class="badge" style="background:#fff1f2;color:var(--danger);">Pending</span></td>
                             <td style="white-space: nowrap;">
                                 <button class="btn btn-primary btn-sm" onclick='viewDirectSaleDetail(${JSON.stringify(r).replace(/'/g, "&apos;")})'>View Details</button>
+                                <button class="btn btn-outline btn-sm" style="margin-left: 8px;" onclick='openEditRecordModal("direct_sale", ${JSON.stringify(r).replace(/'/g, "&apos;")})'>Edit</button>
                                 <button class="btn btn-warning btn-sm" style="margin-left: 8px;" onclick="window.openPendingPaymentModal(${r.id}, ${r.balance_amount})">Pay Pending</button>
                             </td>
                         </tr>
@@ -2547,7 +2548,8 @@
                     <td><span style="color:${p.total_balance > 0 ? 'var(--danger)' : 'inherit'}; font-weight:${p.total_balance > 0 ? '600' : 'normal'}">₹${(p.total_balance || 0).toFixed(2)}</span></td>
                     <td style="white-space: nowrap;">
                         <button class="btn btn-primary btn-sm" onclick="viewPatientHistory('${p.phone}', '${p.name.replace(/'/g, "\\'")}')">View Details</button>
-                        <button class="btn btn-outline btn-sm" style="margin-left: 8px;" onclick="deletePatient(${p.id})">Delete</button>
+                        <button class="btn btn-outline btn-sm" style="margin-left: 8px;" onclick="editPatientLastVisit('${p.phone}', '${p.name.replace(/'/g, "\\'")}')">Edit</button>
+                        <button class="btn btn-outline btn-sm" style="margin-left: 8px; color:var(--danger); border-color:var(--danger);" onclick="deletePatient(${p.id})">Delete</button>
                     </td>
                 </tr>
             `).join('');
@@ -2767,6 +2769,7 @@
                                                     <b>Balance:</b> ₹${(visit.balance_amount || 0).toFixed(2)}
                                                 </span>
                                                 <button class="btn btn-outline btn-sm" style="font-size: 0.7rem; padding: 2px 8px; border-color: var(--primary); color: var(--primary);" onclick="editBalance(${visit.presc_id}, ${visit.paid_amount || 0}, ${visit.balance_amount || 0}, '${phone}', '${name.replace(/'/g, "\\'")}')">Edit Balance</button>
+                                                <button class="btn btn-outline btn-sm" style="font-size: 0.7rem; padding: 2px 8px; border-color: var(--emerald); color: var(--emerald);" onclick='openEditRecordModal("prescription", ${JSON.stringify(visit).replace(/'/g, "&apos;")}, "${phone}", "${name.replace(/'/g, "\\'")}")'>Edit Details</button>
                                                 <button class="btn btn-outline btn-sm" style="font-size: 0.7rem; padding: 2px 8px; border-color: var(--warning); color: var(--warning);" onclick='openReturnModal(${JSON.stringify(visit).replace(/'/g, "&apos;")}, "prescription")'>Return Medicine</button>
                                                 ${visit.scan_fee > 0 ? `<button class="btn btn-outline btn-sm" style="font-size: 0.7rem; padding: 2px 8px; border-color: var(--accent); color: var(--accent);" onclick="viewScanDetails(${visit.presc_id}, '${name.replace(/'/g, "\\'")}', '${visit.patient_id || ''}', '${visit.created_at}', ${visit.scan_fee}, '${(visit.scan_type && visit.scan_type !== '-') ? visit.scan_type : 'N/A'}', '${(visit.scan_notes || '').replace(/'/g, "\\'")}', '${visit.balance_amount > 0 ? 'Pending' : 'Paid'}')">Scan Details</button>` : ''}
                                             </div>
@@ -2828,6 +2831,335 @@
                 if (e.message && (e.message.includes('Password') || e.message.includes('403'))) { alert('Incorrect Password'); } else { toast(e.message || 'Operation failed', 'error'); }
             }
         }
+
+        }
+
+        // EDIT RECORD LOGIC FOR PATIENT VISITS & DIRECT SALES
+        window.openEditRecordModal = async function(type, record, phone = '', name = '') {
+            // Populate simple info
+            document.getElementById('editRecordType').value = type;
+            document.getElementById('editRecordId').value = record.presc_id || record.id;
+            document.getElementById('editRecordName').value = name || record.customer_name || '';
+            document.getElementById('editRecordPhone').value = phone || record.mobile_number || '';
+            
+            // Hide/show doctor & clinical fields
+            if (type === 'prescription') {
+                document.getElementById('editRecordTitle').textContent = `Edit Prescription Details (ID: #${record.presc_id})`;
+                document.getElementById('editRecordDoctorGroup').style.display = 'block';
+                document.getElementById('editRecordPrescriptionFields').style.display = 'block';
+                document.getElementById('editRecordConsultFeeGroup').style.display = 'block';
+                
+                // Populate doctor dropdown
+                const docSelect = document.getElementById('editRecordDoctor');
+                docSelect.innerHTML = `<option value="">Select Doctor</option>` + allDoctors.map(d => 
+                    `<option value="${d.id}">${formatDoctorName(d.display_name, d.doctor_type)}</option>`
+                ).join('');
+                docSelect.value = record.doctor_id || '';
+                
+                document.getElementById('editRecordDiagnosis').value = record.diagnosis || '';
+                document.getElementById('editRecordPrescText').value = record.prescription_text || '';
+                document.getElementById('editRecordScanType').value = (record.scan_type && record.scan_type !== '-') ? record.scan_type : '';
+                document.getElementById('editRecordScanFee').value = parseFloat(record.scan_fee || 0);
+                document.getElementById('editRecordScanNotes').value = record.scan_notes || '';
+                document.getElementById('editRecordConsultFee').value = parseFloat(record.consultation_fee || 0);
+            } else {
+                document.getElementById('editRecordTitle').textContent = `Edit Direct Sale Details (ID: DS-${record.id})`;
+                document.getElementById('editRecordDoctorGroup').style.display = 'none';
+                document.getElementById('editRecordPrescriptionFields').style.display = 'none';
+                document.getElementById('editRecordConsultFeeGroup').style.display = 'none';
+            }
+            
+            // Populate procedures
+            document.getElementById('editRecordInjDetails').value = record.injection_details || '';
+            document.getElementById('editRecordInjCost').value = parseFloat(record.injection_cost || 0);
+            document.getElementById('editRecordIvDetails').value = record.iv_details || '';
+            document.getElementById('editRecordIvCost').value = parseFloat(record.iv_cost || 0);
+            document.getElementById('editRecordUptCard').checked = (record.upt_card == 1);
+            document.getElementById('editRecordUptCost').value = parseFloat(record.upt_cost || 0);
+            
+            // Populate discount & payments
+            document.getElementById('editRecordDiscount').value = parseFloat(record.discount_percent || 0);
+            document.getElementById('editRecordCash').value = parseFloat(record.cash_amount || 0);
+            document.getElementById('editRecordGpay').value = parseFloat(record.gpay_amount || 0);
+            document.getElementById('editRecordPhonepe').value = parseFloat(record.phonepe_amount || 0);
+            document.getElementById('editRecordBank').value = parseFloat(record.bank_amount || 0);
+            
+            // Populate UPI Accounts
+            let upiAccounts = [];
+            try {
+                upiAccounts = await api('/api/upi_accounts') || [];
+            } catch (e) {
+                console.error(e);
+            }
+            const upiSelect = document.getElementById('editRecordUpiAccount');
+            upiSelect.innerHTML = `<option value="">Select UPI Account</option>` + 
+                upiAccounts.map(acc => `<option value="${acc.short_name}">${acc.account_name}</option>`).join('');
+            upiSelect.value = record.upi_account || '';
+            
+            // Populate medicines list
+            const medicines = typeof record.medicines === 'string' ? JSON.parse(record.medicines || '[]') : (record.medicines || []);
+            document.getElementById('editMedicinesBody').innerHTML = '';
+            medicines.forEach(m => addEditMedicineRow(m));
+            
+            recalcEditTotal();
+            openModal('editRecordModal');
+        };
+
+        window.editPatientLastVisit = async function(phone, name) {
+            try {
+                const url = `/api/patient_history/${encodeURIComponent(phone)}?name=${encodeURIComponent(name)}`;
+                const history = await api(url);
+                if (history.length === 0) {
+                    toast('No visit history found to edit', 'error');
+                    return;
+                }
+                if (history.length === 1) {
+                    openEditRecordModal("prescription", history[0], phone, name);
+                    return;
+                }
+                
+                // Let user choose which visit to edit
+                const inputOptions = {};
+                history.forEach((visit) => {
+                    const d = new Date(visit.visit_date);
+                    const formattedDate = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+                    inputOptions[visit.presc_id] = `${formattedDate} - ${visit.doctor_type} Doctor (Diagnosis: ${visit.diagnosis || 'None'})`;
+                });
+                
+                const { value: selectedId } = await Swal.fire({
+                    title: 'Select Visit to Edit',
+                    input: 'select',
+                    inputOptions: inputOptions,
+                    inputPlaceholder: 'Select a visit',
+                    showCancelButton: true,
+                    confirmButtonText: 'Edit',
+                    inputValidator: (value) => {
+                        return new Promise((resolve) => {
+                            if (value) {
+                                resolve();
+                            } else {
+                                resolve('You must select a visit to edit');
+                            }
+                        });
+                    }
+                });
+                
+                if (selectedId) {
+                    const visit = history.find(v => String(v.presc_id) === String(selectedId));
+                    if (visit) openEditRecordModal("prescription", visit, phone, name);
+                }
+            } catch (e) {
+                toast('Failed to load visit history', 'error');
+            }
+        };
+
+        window.addEditMedicineRow = function(m = null) {
+            const tbody = document.getElementById('editMedicinesBody');
+            const tr = document.createElement('tr');
+            tr.className = 'medicine-row';
+            tr.style.position = 'relative';
+            tr.innerHTML = `
+                <td>
+                    <input type="text" class="form-control med-name" placeholder="Medicine name" autocomplete="off" oninput="window.searchMedicine(this)" style="width: 100%; box-sizing: border-box;" required value="${m ? m.name : ''}">
+                    <input type="hidden" class="med-batch-id" value="${m ? (m.batch_id || '') : ''}">
+                    <input type="hidden" class="med-tps" value="${m ? (m.tps || 1) : 1}">
+                    <div class="med-suggestions" style="display: none; position: absolute; background: white; border: 1px solid var(--border); z-index: 10; width: 90%; max-height: 200px; overflow-y: auto; box-shadow: var(--shadow);"></div>
+                </td>
+                <td>
+                    <input type="number" class="form-control med-qty" value="${m ? m.qty : 1}" min="1" oninput="calcEditRow(this)" style="width: 100%; box-sizing: border-box;" required>
+                </td>
+                <td>
+                    <input type="number" step="0.01" class="form-control med-price" value="${m ? parseFloat(m.unit_price || 0).toFixed(2) : '0.00'}" oninput="calcEditRow(this)" style="width: 100%; box-sizing: border-box;" required>
+                </td>
+                <td>
+                    <input type="number" step="0.01" class="form-control med-amount" value="${m ? parseFloat(m.amount || 0).toFixed(2) : '0.00'}" readonly style="width: 100%; box-sizing: border-box; background: var(--bg-hover);">
+                </td>
+                <td>
+                    <button type="button" class="btn btn-sm btn-outline" style="color:var(--danger); border-color:var(--danger);" onclick="removeEditMedicineRow(this)">✕</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        };
+
+        window.calcEditRow = function(input) {
+            const row = input.closest('.medicine-row');
+            const qty = parseInt(row.querySelector('.med-qty').value) || 0;
+            const price = parseFloat(row.querySelector('.med-price').value) || 0;
+            row.querySelector('.med-amount').value = (qty * price).toFixed(2);
+            recalcEditTotal();
+        };
+
+        window.removeEditMedicineRow = function(btn) {
+            btn.closest('.medicine-row').remove();
+            recalcEditTotal();
+        };
+
+        window.recalcEditTotal = function() {
+            const type = document.getElementById('editRecordType').value;
+            
+            // Sum medicines
+            let medSum = 0;
+            document.querySelectorAll('#editMedicinesBody .medicine-row').forEach(row => {
+                const amt = parseFloat(row.querySelector('.med-amount').value) || 0;
+                medSum += amt;
+            });
+            
+            let subtotal = medSum;
+            
+            // Add procedures & cards
+            subtotal += parseFloat(document.getElementById('editRecordInjCost').value) || 0;
+            subtotal += parseFloat(document.getElementById('editRecordIvCost').value) || 0;
+            subtotal += parseFloat(document.getElementById('editRecordUptCost').value) || 0;
+            
+            // Add scan fee and consultation fee for prescription
+            if (type === 'prescription') {
+                subtotal += parseFloat(document.getElementById('editRecordScanFee').value) || 0;
+                subtotal += parseFloat(document.getElementById('editRecordConsultFee').value) || 0;
+            }
+            
+            // Apply discount
+            const disc = parseFloat(document.getElementById('editRecordDiscount').value) || 0;
+            let grand = subtotal;
+            if (disc > 0) {
+                grand = subtotal - (subtotal * (disc / 100));
+            }
+            
+            document.getElementById('editRecordGrandTotal').value = grand.toFixed(2);
+            recalcEditPayments();
+        };
+
+        window.recalcEditPayments = function() {
+            const cash = parseFloat(document.getElementById('editRecordCash').value) || 0;
+            const gpay = parseFloat(document.getElementById('editRecordGpay').value) || 0;
+            const phonepe = parseFloat(document.getElementById('editRecordPhonepe').value) || 0;
+            const bank = parseFloat(document.getElementById('editRecordBank').value) || 0;
+            
+            const paid = cash + gpay + phonepe + bank;
+            document.getElementById('editRecordTotalPaid').value = paid.toFixed(2);
+            
+            const grand = parseFloat(document.getElementById('editRecordGrandTotal').value) || 0;
+            const balance = Math.max(0, grand - paid);
+            document.getElementById('editRecordBalance').value = balance.toFixed(2);
+        };
+
+        window.toggleEditUptCost = function() {
+            const checked = document.getElementById('editRecordUptCard').checked;
+            const costInput = document.getElementById('editRecordUptCost');
+            if (checked) {
+                if ((parseFloat(costInput.value) || 0) <= 0) costInput.value = 150;
+            } else {
+                costInput.value = 0;
+            }
+            recalcEditTotal();
+        };
+
+        window.saveEditedRecord = async function(event) {
+            event.preventDefault();
+            
+            const type = document.getElementById('editRecordType').value;
+            const id = document.getElementById('editRecordId').value;
+            
+            // Collect medicines
+            const medicines = [];
+            let validMeds = true;
+            document.querySelectorAll('#editMedicinesBody .medicine-row').forEach(row => {
+                const name = row.querySelector('.med-name').value.trim();
+                const qty = parseInt(row.querySelector('.med-qty').value) || 0;
+                const price = parseFloat(row.querySelector('.med-price').value) || 0;
+                const amt = parseFloat(row.querySelector('.med-amount').value) || 0;
+                const batch_id = row.querySelector('.med-batch-id').value;
+                const tps = parseInt(row.querySelector('.med-tps').value) || 1;
+                
+                if (!name) {
+                    validMeds = false;
+                    return;
+                }
+                
+                medicines.push({
+                    name: name,
+                    qty: qty,
+                    unit_price: price,
+                    amount: amt,
+                    batch_id: batch_id,
+                    tps: tps
+                });
+            });
+            
+            if (!validMeds) {
+                toast('Please enter a name for all medicines', 'error');
+                return;
+            }
+            
+            const body = {
+                type: type,
+                id: id,
+                customer_name: document.getElementById('editRecordName').value.trim(),
+                mobile_number: document.getElementById('editRecordPhone').value.trim(),
+                injection_details: document.getElementById('editRecordInjDetails').value.trim(),
+                injection_cost: parseFloat(document.getElementById('editRecordInjCost').value) || 0,
+                iv_details: document.getElementById('editRecordIvDetails').value.trim(),
+                iv_cost: parseFloat(document.getElementById('editRecordIvCost').value) || 0,
+                upt_card: document.getElementById('editRecordUptCard').checked ? 1 : 0,
+                upt_cost: parseFloat(document.getElementById('editRecordUptCost').value) || 0,
+                discount_percent: parseFloat(document.getElementById('editRecordDiscount').value) || 0,
+                cash_amount: parseFloat(document.getElementById('editRecordCash').value) || 0,
+                gpay_amount: parseFloat(document.getElementById('editRecordGpay').value) || 0,
+                phonepe_amount: parseFloat(document.getElementById('editRecordPhonepe').value) || 0,
+                bank_amount: parseFloat(document.getElementById('editRecordBank').value) || 0,
+                paid_amount: parseFloat(document.getElementById('editRecordTotalPaid').value) || 0,
+                balance_amount: parseFloat(document.getElementById('editRecordBalance').value) || 0,
+                upi_account: document.getElementById('editRecordUpiAccount').value,
+                medicines: medicines
+            };
+            
+            if (type === 'prescription') {
+                body.doctor_id = document.getElementById('editRecordDoctor').value;
+                body.diagnosis = document.getElementById('editRecordDiagnosis').value.trim();
+                body.prescription_text = document.getElementById('editRecordPrescText').value.trim();
+                body.scan_type = document.getElementById('editRecordScanType').value.trim();
+                body.scan_fee = parseFloat(document.getElementById('editRecordScanFee').value) || 0;
+                body.scan_notes = document.getElementById('editRecordScanNotes').value.trim();
+                body.consultation_fee = parseFloat(document.getElementById('editRecordConsultFee').value) || 0;
+            }
+            
+            try {
+                const res = await api('/api/management/edit_record', {
+                    method: 'POST',
+                    body: body
+                });
+                
+                if (res.success) {
+                    toast('Record updated successfully', 'success');
+                    closeModal('editRecordModal');
+                    
+                    // Reload parent context/lists
+                    if (type === 'prescription') {
+                        // If the history modal is open, refresh it
+                        const patientNameEl = document.getElementById('historyPatientName');
+                        if (patientNameEl && patientNameEl.textContent) {
+                            const text = patientNameEl.textContent;
+                            const phone = text.substring(text.indexOf('(') + 1, text.indexOf(')'));
+                            const name = text.substring(0, text.indexOf('(')).trim();
+                            viewPatientHistory(phone, name);
+                        }
+                        loadPatientsList();
+                    } else {
+                        // Refresh direct sales list
+                        if (typeof loadDirectSalesAdmin === 'function') {
+                            loadDirectSalesAdmin();
+                        }
+                        loadPatientsList();
+                    }
+                    if (typeof loadAnalytics === 'function') {
+                        loadAnalytics(); // Refresh dashboard cards
+                    }
+                } else {
+                    toast(res.error || 'Failed to update record', 'error');
+                }
+            } catch (e) {
+                toast(e.message || 'Operation failed', 'error');
+            }
+        };
 
         // MASTER CONTROL LOGIC
         function switchMasterTab(tab, btn) {
@@ -4840,6 +5172,181 @@
                 <button class="btn btn-outline" onclick="closeModal('autoBackupSettingsModal')">Cancel</button>
                 <button class="btn btn-primary" onclick="saveAutoBackupSettings()" style="margin-left: 10px;">Save
                     Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Record Modal -->
+    <div class="modal-overlay" id="editRecordModal">
+        <div class="modal" style="max-width: 900px; width: 95%;">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+                <h3 id="editRecordTitle" style="display: flex; align-items: center; gap: 8px;">
+                    Edit Record Details
+                </h3>
+                <button class="modal-close" onclick="closeModal('editRecordModal')">✕</button>
+            </div>
+            <div class="modal-body" style="padding: 20px; max-height: 75vh; overflow-y: auto;">
+                <form id="editRecordForm" onsubmit="saveEditedRecord(event)">
+                    <input type="hidden" id="editRecordType">
+                    <input type="hidden" id="editRecordId">
+                    
+                    <h4 style="margin-top: 0; margin-bottom: 15px; border-bottom: 2px solid var(--primary); padding-bottom: 6px; color: var(--primary);">Basic Information</h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px;">
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">Customer/Patient Name</label>
+                            <input type="text" id="editRecordName" required class="form-control" style="width: 100%; box-sizing: border-box;">
+                        </div>
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">Mobile Number</label>
+                            <input type="text" id="editRecordPhone" class="form-control" style="width: 100%; box-sizing: border-box;">
+                        </div>
+                        <div class="form-group" id="editRecordDoctorGroup">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">Doctor</label>
+                            <select id="editRecordDoctor" class="form-control" style="width: 100%; box-sizing: border-box;">
+                                <!-- Doctors options injected dynamically -->
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div id="editRecordPrescriptionFields">
+                        <h4 style="margin-bottom: 15px; border-bottom: 2px solid var(--primary); padding-bottom: 6px; color: var(--primary);">Clinical Information</h4>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px;">
+                            <div class="form-group">
+                                <label style="display:block; margin-bottom: 5px; font-weight: 600;">Diagnosis</label>
+                                <input type="text" id="editRecordDiagnosis" class="form-control" style="width: 100%; box-sizing: border-box;">
+                            </div>
+                            <div class="form-group">
+                                <label style="display:block; margin-bottom: 5px; font-weight: 600;">Prescription Text</label>
+                                <textarea id="editRecordPrescText" class="form-control" style="width: 100%; box-sizing: border-box; height: 38px; resize: vertical;"></textarea>
+                            </div>
+                        </div>
+                        
+                        <h4 style="margin-bottom: 15px; border-bottom: 2px solid var(--primary); padding-bottom: 6px; color: var(--primary);">Scan Details</h4>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 20px;">
+                            <div class="form-group">
+                                <label style="display:block; margin-bottom: 5px; font-weight: 600;">Scan Type</label>
+                                <input type="text" id="editRecordScanType" class="form-control" style="width: 100%; box-sizing: border-box;">
+                            </div>
+                            <div class="form-group">
+                                <label style="display:block; margin-bottom: 5px; font-weight: 600;">Scan Fee (₹)</label>
+                                <input type="number" step="0.01" id="editRecordScanFee" class="form-control" style="width: 100%; box-sizing: border-box;" oninput="recalcEditTotal()">
+                            </div>
+                            <div class="form-group" style="grid-column: span 2;">
+                                <label style="display:block; margin-bottom: 5px; font-weight: 600;">Scan Notes</label>
+                                <input type="text" id="editRecordScanNotes" class="form-control" style="width: 100%; box-sizing: border-box;">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <h4 style="margin-bottom: 15px; border-bottom: 2px solid var(--primary); padding-bottom: 6px; color: var(--primary);">Medical Procedures & Cards</h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 20px;">
+                        <div class="form-group" style="position: relative;">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">Injection Details</label>
+                            <input type="text" id="editRecordInjDetails" class="form-control" autocomplete="off" oninput="window.searchInventoryCategory('Injection', this)" style="width: 100%; box-sizing: border-box;">
+                            <div class="med-suggestions" style="display: none; position: absolute; background: white; border: 1px solid var(--border); z-index: 10; width: 90%; max-height: 200px; overflow-y: auto; box-shadow: var(--shadow);"></div>
+                        </div>
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">Injection Cost (₹)</label>
+                            <input type="number" step="0.01" id="editRecordInjCost" class="form-control" style="width: 100%; box-sizing: border-box;" oninput="recalcEditTotal()">
+                        </div>
+                        <div class="form-group" style="position: relative;">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">IV Details</label>
+                            <input type="text" id="editRecordIvDetails" class="form-control" autocomplete="off" oninput="window.searchInventoryCategory('IV Fluids', this)" style="width: 100%; box-sizing: border-box;">
+                            <div class="med-suggestions" style="display: none; position: absolute; background: white; border: 1px solid var(--border); z-index: 10; width: 90%; max-height: 200px; overflow-y: auto; box-shadow: var(--shadow);"></div>
+                        </div>
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">IV Cost (₹)</label>
+                            <input type="number" step="0.01" id="editRecordIvCost" class="form-control" style="width: 100%; box-sizing: border-box;" oninput="recalcEditTotal()">
+                        </div>
+                        <div class="form-group" style="display:flex; align-items:center; gap: 8px; margin-top:20px;">
+                            <input type="checkbox" id="editRecordUptCard" onchange="toggleEditUptCost()">
+                            <label for="editRecordUptCard" style="font-weight: 600; cursor:pointer;">UPT Card</label>
+                        </div>
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">UPT Cost (₹)</label>
+                            <input type="number" step="0.01" id="editRecordUptCost" class="form-control" style="width: 100%; box-sizing: border-box;" oninput="recalcEditTotal()">
+                        </div>
+                    </div>
+                    
+                    <h4 style="margin-bottom: 15px; border-bottom: 2px solid var(--primary); padding-bottom: 6px; color: var(--primary); display: flex; justify-content: space-between; align-items: center;">
+                        <span>Prescribed Medicines</span>
+                        <button type="button" class="btn btn-outline btn-sm" onclick="addEditMedicineRow()">+ Add Medicine</button>
+                    </h4>
+                    
+                    <div style="overflow-x: auto; margin-bottom: 20px;">
+                        <table class="data-table" style="width: 100%; min-width: 600px;">
+                            <thead>
+                                <tr>
+                                    <th style="width: 45%;">Medicine Name</th>
+                                    <th style="width: 15%;">Qty</th>
+                                    <th style="width: 15%;">Unit Price (₹)</th>
+                                    <th style="width: 15%;">Amount (₹)</th>
+                                    <th style="width: 10%;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="editMedicinesBody">
+                                <!-- Medicine rows injected dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <h4 style="margin-bottom: 15px; border-bottom: 2px solid var(--primary); padding-bottom: 6px; color: var(--primary);">Payment & Billing Breakdown</h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 20px;">
+                        <div class="form-group" id="editRecordConsultFeeGroup">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">Consultation Fee (₹)</label>
+                            <input type="number" step="0.01" id="editRecordConsultFee" class="form-control" style="width: 100%; box-sizing: border-box;" oninput="recalcEditTotal()">
+                        </div>
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">Discount (%)</label>
+                            <input type="number" step="0.01" id="editRecordDiscount" class="form-control" style="width: 100%; box-sizing: border-box;" oninput="recalcEditTotal()">
+                        </div>
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600; color: var(--primary);">Grand Total (₹)</label>
+                            <input type="number" step="0.01" id="editRecordGrandTotal" class="form-control" readonly style="width: 100%; box-sizing: border-box; background: var(--bg-hover); font-weight: 700;">
+                        </div>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-bottom: 20px;">
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">Cash Paid (₹)</label>
+                            <input type="number" step="0.01" id="editRecordCash" class="form-control" style="width: 100%; box-sizing: border-box;" oninput="recalcEditPayments()">
+                        </div>
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">GPay Paid (₹)</label>
+                            <input type="number" step="0.01" id="editRecordGpay" class="form-control" style="width: 100%; box-sizing: border-box;" oninput="recalcEditPayments()">
+                        </div>
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">PhonePe Paid (₹)</label>
+                            <input type="number" step="0.01" id="editRecordPhonepe" class="form-control" style="width: 100%; box-sizing: border-box;" oninput="recalcEditPayments()">
+                        </div>
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">Bank Paid (₹)</label>
+                            <input type="number" step="0.01" id="editRecordBank" class="form-control" style="width: 100%; box-sizing: border-box;" oninput="recalcEditPayments()">
+                        </div>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 20px;">
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600; color: var(--success);">Total Paid (₹)</label>
+                            <input type="number" step="0.01" id="editRecordTotalPaid" class="form-control" readonly style="width: 100%; box-sizing: border-box; background: var(--bg-hover); font-weight: 700; color: var(--success);">
+                        </div>
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600; color: var(--danger);">Balance Due (₹)</label>
+                            <input type="number" step="0.01" id="editRecordBalance" class="form-control" readonly style="width: 100%; box-sizing: border-box; background: var(--bg-hover); font-weight: 700; color: var(--danger);">
+                        </div>
+                        <div class="form-group">
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">UPI Account</label>
+                            <select id="editRecordUpiAccount" class="form-control" style="width: 100%; box-sizing: border-box;">
+                                <!-- UPI accounts options injected dynamically -->
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="modal-footer" style="padding: 16px 0 0 0; text-align: right; border-top: 1px solid var(--border); margin-top: 20px;">
+                        <button type="button" class="btn btn-outline" onclick="closeModal('editRecordModal')">Cancel</button>
+                        <button type="submit" class="btn btn-primary" style="margin-left: 10px;">Save Changes</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
