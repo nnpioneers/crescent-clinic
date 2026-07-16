@@ -2047,7 +2047,7 @@
                         <td>${statusBadge}</td>
                         <td style="display:flex; gap:6px; flex-wrap:wrap;">
                             <button class="btn btn-outline btn-sm" onclick='viewDirectSaleDetail(${JSON.stringify(r).replace(/'/g, "&apos;")})'>View</button>
-                            <button class="btn btn-outline btn-sm" onclick='editDirectSaleCustomer(${r.id}, "${(r.customer_name || '').replace(/"/g, "&quot;")}", "${(r.mobile_number || '').replace(/"/g, "&quot;")}")'>Edit</button>
+                            <button class="btn btn-outline btn-sm" onclick='openEditRecordModal("direct_sale", ${JSON.stringify(r).replace(/'/g, "&apos;")})'>Edit</button>
                             <button class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger);" onclick="deleteDirectSale(${r.id})">Delete</button>
                         </td>
                     </tr>`;
