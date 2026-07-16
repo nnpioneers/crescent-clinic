@@ -1039,7 +1039,7 @@ window.onunhandledrejection = function(event) {
             const actions = isPending
                 ? `<button class="btn btn-warning btn-sm" onclick="openMedicineModal(${p.presc_id}, '${p.name.replace(/'/g, "\\'")}', '${(p.diagnosis || '').replace(/'/g, "\\'")}', '${(p.prescription_text || '').replace(/'/g, "\\'")}')">Add Medicines</button>`
                 : `<button class="btn btn-outline btn-sm" onclick="viewDetail(${p.presc_id})">View / PDF</button>
-                   <button class="btn btn-outline btn-sm" style="margin-left: 6px; border-color: var(--emerald); color: var(--emerald);" onclick='openEditRecordModal("prescription", ${JSON.stringify(p).replace(/'/g, "&apos;")}, "${p.phone}", "${p.name.replace(/'/g, "\\'")}")'>Edit</button>`;
+                   <button class="btn btn-outline btn-sm" style="margin-left: 6px; border-color: var(--emerald); color: var(--emerald);" onclick="editPrescriptionRecord(${p.presc_id})">Edit</button>`;
 
             const uptBadge = (p.presc_doctor_type === 'Lady' && p.upt_card) ?
                 '<span class="badge" style="margin-top: 6px; display: inline-block; font-size: 0.6rem; border-color: #f43f5e; color: #f43f5e; margin-left: 4px;">UPT Card Required</span>' : '';
@@ -1086,6 +1086,20 @@ window.onunhandledrejection = function(event) {
             </tr>`;
         }).join('');
     }
+
+    window.editPrescriptionRecord = function (prescId) {
+        const list = window.currentPatients || [];
+        const record = list.find(p => p.presc_id == prescId);
+        if (record) {
+            if (typeof openEditRecordModal === 'function') {
+                openEditRecordModal("prescription", record, record.phone, record.name);
+            } else {
+                toast('Edit Record Modal is not loaded on this page', 'error');
+            }
+        } else {
+            toast('Record not found', 'error');
+        }
+    };
 
     window.openMedicineModal = async function (prescId, name, diag, presc) {
         currentPrescId = prescId;
