@@ -2833,7 +2833,7 @@
         }
 
         // EDIT RECORD LOGIC FOR PATIENT VISITS & DIRECT SALES
-        window.openEditRecordModal = async function(type, record, phone = '', name = '') {
+        async function openEditRecordModal(type, record, phone = '', name = '') {
             // Populate simple info
             document.getElementById('editRecordType').value = type;
             document.getElementById('editRecordId').value = record.presc_id || record.id;
@@ -2901,9 +2901,10 @@
             
             recalcEditTotal();
             openModal('editRecordModal');
-        };
+        }
+        window.openEditRecordModal = openEditRecordModal;
 
-        window.editPatientLastVisit = async function(phone, name) {
+        async function editPatientLastVisit(phone, name) {
             try {
                 const url = `/api/patient_history/${encodeURIComponent(phone)}?name=${encodeURIComponent(name)}`;
                 const history = await api(url);
@@ -2949,9 +2950,10 @@
             } catch (e) {
                 toast('Failed to load visit history', 'error');
             }
-        };
+        }
+        window.editPatientLastVisit = editPatientLastVisit;
 
-        window.addEditMedicineRow = function(m = null) {
+        function addEditMedicineRow(m = null) {
             const tbody = document.getElementById('editMedicinesBody');
             const tr = document.createElement('tr');
             tr.className = 'medicine-row';
@@ -2977,22 +2979,26 @@
                 </td>
             `;
             tbody.appendChild(tr);
-        };
+        }
+        window.addEditMedicineRow = addEditMedicineRow;
 
-        window.calcEditRow = function(input) {
+        function calcEditRow(input) {
             const row = input.closest('.medicine-row');
+            if (!row) return;
             const qty = parseInt(row.querySelector('.med-qty').value) || 0;
             const price = parseFloat(row.querySelector('.med-price').value) || 0;
             row.querySelector('.med-amount').value = (qty * price).toFixed(2);
             recalcEditTotal();
-        };
+        }
+        window.calcEditRow = calcEditRow;
 
-        window.removeEditMedicineRow = function(btn) {
+        function removeEditMedicineRow(btn) {
             btn.closest('.medicine-row').remove();
             recalcEditTotal();
-        };
+        }
+        window.removeEditMedicineRow = removeEditMedicineRow;
 
-        window.recalcEditTotal = function() {
+        function recalcEditTotal() {
             const type = document.getElementById('editRecordType').value;
             
             // Sum medicines
@@ -3024,9 +3030,10 @@
             
             document.getElementById('editRecordGrandTotal').value = grand.toFixed(2);
             recalcEditPayments();
-        };
+        }
+        window.recalcEditTotal = recalcEditTotal;
 
-        window.recalcEditPayments = function() {
+        function recalcEditPayments() {
             const cash = parseFloat(document.getElementById('editRecordCash').value) || 0;
             const gpay = parseFloat(document.getElementById('editRecordGpay').value) || 0;
             const phonepe = parseFloat(document.getElementById('editRecordPhonepe').value) || 0;
@@ -3038,9 +3045,10 @@
             const grand = parseFloat(document.getElementById('editRecordGrandTotal').value) || 0;
             const balance = Math.max(0, grand - paid);
             document.getElementById('editRecordBalance').value = balance.toFixed(2);
-        };
+        }
+        window.recalcEditPayments = recalcEditPayments;
 
-        window.toggleEditUptCost = function() {
+        function toggleEditUptCost() {
             const checked = document.getElementById('editRecordUptCard').checked;
             const costInput = document.getElementById('editRecordUptCost');
             if (checked) {
@@ -3049,9 +3057,10 @@
                 costInput.value = 0;
             }
             recalcEditTotal();
-        };
+        }
+        window.toggleEditUptCost = toggleEditUptCost;
 
-        window.saveEditedRecord = async function(event) {
+        async function saveEditedRecord(event) {
             event.preventDefault();
             
             const type = document.getElementById('editRecordType').value;
@@ -3157,7 +3166,56 @@
             } catch (e) {
                 toast(e.message || 'Operation failed', 'error');
             }
-        };
+        }
+        window.saveEditedRecord = saveEditedRecord;
+
+        // Middleware Interceptors for Global Pharmacy helper functions
+        window.addEventListener('load', () => {
+            const originalCalcRowAmount = window.calcRowAmount;
+            window.calcRowAmount = function(el) {
+                if (el && el.closest && el.closest('#editRecordModal')) {
+                    const row = el.closest('.medicine-row');
+                    if (row) {
+                        const qty = parseInt(row.querySelector('.med-qty').value) || 0;
+                        const price = parseFloat(row.querySelector('.med-price').value) || 0;
+                        const amtInput = row.querySelector('.med-amount');
+                        if (amtInput) {
+                            amtInput.value = (qty * price).toFixed(2);
+                        }
+                    }
+                    if (typeof recalcEditTotal === 'function') {
+                        recalcEditTotal();
+                    }
+                    return;
+                }
+                if (typeof originalCalcRowAmount === 'function') {
+                    originalCalcRowAmount(el);
+                }
+            };
+
+            const originalSelectInventoryCategoryItem = window.selectInventoryCategoryItem;
+            window.selectInventoryCategoryItem = function (category, name, price, inputId, isUnmapped = 0) {
+                if (inputId && (inputId === 'editRecordInjDetails' || inputId === 'editRecordIvDetails')) {
+                    const input = document.getElementById(inputId);
+                    if (input) {
+                        input.value = name;
+                        const suggBox = input.nextElementSibling;
+                        if (suggBox) suggBox.style.display = 'none';
+                        
+                        const costInputId = inputId === 'editRecordInjDetails' ? 'editRecordInjCost' : 'editRecordIvCost';
+                        const costInput = document.getElementById(costInputId);
+                        if (costInput) {
+                            costInput.value = price;
+                        }
+                        if (typeof recalcEditTotal === 'function') recalcEditTotal();
+                    }
+                    return;
+                }
+                if (typeof originalSelectInventoryCategoryItem === 'function') {
+                    originalSelectInventoryCategoryItem(category, name, price, inputId, isUnmapped);
+                }
+            };
+        });
 
         // MASTER CONTROL LOGIC
         function switchMasterTab(tab, btn) {
