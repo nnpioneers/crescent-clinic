@@ -1038,7 +1038,8 @@ window.onunhandledrejection = function(event) {
                 : '<span class="badge badge-completed">Completed</span>';
             const actions = isPending
                 ? `<button class="btn btn-warning btn-sm" onclick="openMedicineModal(${p.presc_id}, '${p.name.replace(/'/g, "\\'")}', '${(p.diagnosis || '').replace(/'/g, "\\'")}', '${(p.prescription_text || '').replace(/'/g, "\\'")}')">Add Medicines</button>`
-                : `<button class="btn btn-outline btn-sm" onclick="viewDetail(${p.presc_id})">View / PDF</button>`;
+                : `<button class="btn btn-outline btn-sm" onclick="viewDetail(${p.presc_id})">View / PDF</button>
+                   <button class="btn btn-outline btn-sm" style="margin-left: 6px; border-color: var(--emerald); color: var(--emerald);" onclick='openEditRecordModal("prescription", ${JSON.stringify(p).replace(/'/g, "&apos;")}, "${p.phone}", "${p.name.replace(/'/g, "\\'")}")'>Edit</button>`;
 
             const uptBadge = (p.presc_doctor_type === 'Lady' && p.upt_card) ?
                 '<span class="badge" style="margin-top: 6px; display: inline-block; font-size: 0.6rem; border-color: #f43f5e; color: #f43f5e; margin-left: 4px;">UPT Card Required</span>' : '';
