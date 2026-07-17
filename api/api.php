@@ -533,7 +533,8 @@ if ($uri === '/api/register_patient' && $method === 'POST') {
         $num = (int)$manual_token_num;
         $token = sprintf("%s-%03d", $prefix, $num);
         
-        $stmt = $conn->prepare("SELECT 1 FROM patients WHERE token = ? AND DATE(created_at) = CURDATE()");
+        $today = date('Y-m-d');
+        $stmt = $conn->prepare("SELECT 1 FROM patients WHERE token = ? AND DATE(created_at) = '$today'");
         $stmt->execute([$token]);
         if ($stmt->fetch()) {
             json_response(['success' => false, 'message' => 'Token already assigned.'], 400);
