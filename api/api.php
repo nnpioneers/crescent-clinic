@@ -1916,6 +1916,11 @@ if ($uri === '/api/management/edit_record' && $method === 'POST') {
                 if ($doc) {
                     $doctor_name = $doc['display_name'];
                     $doctor_type = $doc['doctor_type'];
+                    
+                    // REGENERATE TOKEN IF DOCTOR CHANGED
+                    if ($patient_record && $patient_record['doctor_id'] != $doctor_id) {
+                        $token = generate_token($doctor_id);
+                    }
                 }
             }
             
