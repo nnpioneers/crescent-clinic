@@ -2087,6 +2087,7 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
 
     // ── BUG FIX: Also pick up generics that exist in agency_items but have not
     // yet been synced into generic_mappings (e.g. just created via /api/generics/add).
+    $existing_lower = array_map(function($val) { return strtolower($val ?? ''); }, $gm_generics);
     if ($q) {
         $ai_conditions = ["LOWER(TRIM(REPLACE(item_name, 0xEFBBBF, ''))) = '(unmapped brand)'", "generic_name IS NOT NULL", "TRIM(generic_name) != ''", "LOWER(TRIM(REPLACE(generic_name, 0xEFBBBF, ''))) LIKE ?"];
         $ai_params     = [strtolower("$q%")];
@@ -2105,7 +2106,6 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
         $ai_generics = $stmt_ai->fetchAll(PDO::FETCH_COLUMN);
 
         // Merge, deduplicate (case-insensitive), preserve existing order
-        $existing_lower = array_map(function($val) { return strtolower($val ?? ''); }, $gm_generics);
         foreach ($ai_generics as $ag) {
             $ag_clean = strtolower($ag ?? '');
             if (!in_array($ag_clean, $existing_lower, true)) {
