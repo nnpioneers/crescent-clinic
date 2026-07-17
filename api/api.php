@@ -886,14 +886,15 @@ if (($uri === '/api/add_medicines' || $uri === '/api/direct_pharmacy') && $metho
             $pat_phone = $input['patient_phone'] ?? '';
             $token = 'W' . rand(100, 999);
             
+            $now = date('Y-m-d H:i:s');
             $stmt = $conn->prepare("INSERT INTO patients (name, phone, age, gender, doctor_name, doctor_type, token, status, created_at, completed_at) 
-                                    VALUES (?, ?, 0, 'Other', 'Direct Pharmacy', 'Pharmacy', ?, 'completed', NOW(), NOW())");
-            $stmt->execute([$pat_name, $pat_phone, $token]);
+                                    VALUES (?, ?, 0, 'Other', 'Direct Pharmacy', 'Pharmacy', ?, 'completed', ?, ?)");
+            $stmt->execute([$pat_name, $pat_phone, $token, $now, $now]);
             $patient_id = $conn->lastInsertId();
             
             $stmt = $conn->prepare("INSERT INTO prescriptions (patient_id, doctor_name, doctor_type, diagnosis, prescription_text, status, created_at) 
-                                    VALUES (?, 'Direct Pharmacy', 'Pharmacy', '-', '-', 'pending', NOW())");
-            $stmt->execute([$patient_id]);
+                                    VALUES (?, 'Direct Pharmacy', 'Pharmacy', '-', '-', 'pending', ?)");
+            $stmt->execute([$patient_id, $now]);
             $presc_id = $conn->lastInsertId();
             $input['prescription_id'] = $presc_id;
         }
@@ -1089,8 +1090,9 @@ if (($uri === '/api/add_medicines' || $uri === '/api/direct_pharmacy') && $metho
         ]);
 
         // Mark patient status as completed and record checkout time
-        $stmt = $conn->prepare("UPDATE patients SET status='completed', completed_at=NOW() WHERE id=(SELECT patient_id FROM prescriptions WHERE id=?)");
-        $stmt->execute([$presc_id]);
+        $now = date('Y-m-d H:i:s');
+        $stmt = $conn->prepare("UPDATE patients SET status='completed', completed_at=? WHERE id=(SELECT patient_id FROM prescriptions WHERE id=?)");
+        $stmt->execute([$now, $presc_id]);
 
         $stmt = $conn->prepare("SELECT p.*, pr.id as presc_id, pr.diagnosis, pr.prescription_text, pr.medicines,
                    pr.total_amount, pr.consultation_fee, pr.scan_fee,
