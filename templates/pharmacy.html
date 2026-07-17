@@ -588,7 +588,7 @@
                             style="width: 18px; height: 18px;"> UPI
                     </label>
 
-                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; display: none;">
                         <input type="checkbox" id="ppBankCheck" onchange="togglePpInputs()"
                             style="width: 18px; height: 18px;"> Bank Transfer
                     </label>
@@ -610,7 +610,7 @@
                             style="font-size: 1rem; padding: 10px; height: auto; border: 2px solid var(--primary); border-radius: 6px; background-color: #f8fafc; cursor: pointer;"></select>
                     </div>
 
-                    <div id="ppBankGroup" style="display: none;" class="form-group">
+                    <div id="ppBankGroup" style="display: none !important;" class="form-group">
                         <label style="font-size: 0.7rem;">Bank Amount (₹)</label>
                         <input type="number" id="ppBankAmount" value="0" oninput="updatePpBalance()"
                             onfocus="if(this.value==='0') this.value='';" onblur="if(this.value==='') this.value='0';">
@@ -886,14 +886,14 @@
                             <input type="number" step="0.01" id="editRecordCash" class="form-control" style="width: 100%; box-sizing: border-box;" oninput="recalcEditPayments()">
                         </div>
                         <div class="form-group">
-                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">GPay Paid (₹)</label>
+                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">UPI Paid (₹)</label>
                             <input type="number" step="0.01" id="editRecordGpay" class="form-control" style="width: 100%; box-sizing: border-box;" oninput="recalcEditPayments()">
                         </div>
-                        <div class="form-group">
+                        <div class="form-group" style="display:none;">
                             <label style="display:block; margin-bottom: 5px; font-weight: 600;">PhonePe Paid (₹)</label>
                             <input type="number" step="0.01" id="editRecordPhonepe" class="form-control" style="width: 100%; box-sizing: border-box;" oninput="recalcEditPayments()">
                         </div>
-                        <div class="form-group">
+                        <div class="form-group" style="display:none;">
                             <label style="display:block; margin-bottom: 5px; font-weight: 600;">Bank Paid (₹)</label>
                             <input type="number" step="0.01" id="editRecordBank" class="form-control" style="width: 100%; box-sizing: border-box;" oninput="recalcEditPayments()">
                         </div>
@@ -1002,9 +1002,10 @@
             // Populate discount & payments
             document.getElementById('editRecordDiscount').value = parseFloat(record.discount_percent || 0);
             document.getElementById('editRecordCash').value = parseFloat(record.cash_amount || 0);
-            document.getElementById('editRecordGpay').value = parseFloat(record.gpay_amount || 0);
-            document.getElementById('editRecordPhonepe').value = parseFloat(record.phonepe_amount || 0);
-            document.getElementById('editRecordBank').value = parseFloat(record.bank_amount || 0);
+            const sumUpi = parseFloat(record.gpay_amount || 0) + parseFloat(record.phonepe_amount || 0) + parseFloat(record.bank_amount || 0);
+            document.getElementById('editRecordGpay').value = sumUpi;
+            document.getElementById('editRecordPhonepe').value = 0;
+            document.getElementById('editRecordBank').value = 0;
             
             // Populate UPI Accounts
             let upiAccounts = [];

@@ -6448,19 +6448,19 @@ if ($uri === '/api/generics/bulk-categorize' && $method === 'POST') {
         $rows_updated = 0;
 
         $stmt = $conn->prepare("
-            UPDATE generic_mappings SET category = ? 
+            UPDATE generic_mappings SET category = ?, generic_name = ? 
             WHERE TRIM(LOWER(generic_name)) = TRIM(LOWER(?))
         ");
 
         // We also want to update the inventory items themselves to reflect the new category
         $stmt_inv = $conn->prepare("
-            UPDATE inventory SET category = ? 
+            UPDATE inventory SET category = ?, generic_name = ? 
             WHERE TRIM(LOWER(generic_name)) = TRIM(LOWER(?))
         ");
         
         // We also want to update the agency_items
         $stmt_agency = $conn->prepare("
-            UPDATE agency_items SET category = ? 
+            UPDATE agency_items SET category = ?, generic_name = ? 
             WHERE TRIM(LOWER(generic_name)) = TRIM(LOWER(?))
         ");
 
@@ -6468,9 +6468,21 @@ if ($uri === '/api/generics/bulk-categorize' && $method === 'POST') {
             $generic_name = trim($generic_name);
             if ($generic_name === '') continue;
 
-            $stmt->execute([$category, $generic_name]);
-            $stmt_inv->execute([$category, $generic_name]);
-            $stmt_agency->execute([$category, $generic_name]);
+            // Strip existing category bracket like "(TAB)" from the end, if any
+            $base_name = preg_replace('/\s*\([A-Z]+\)$/i', '', $generic_name);
+            $new_name = $base_name . ' (' . strtoupper($category) . ')';
+
+            $stmt->execute([$category, $new_name, $generic_name]);
+            $stmt_inv->execute([$category, $new_name, $generic_name]);
+            $stmt_agency->execute([$category, $new_name, $generic_name]);
+            
+            // Also update "Without Brand" associated records
+            $old_wb_name = $generic_name . ' (Without Brand)';
+            $new_wb_name = $new_name . ' (Without Brand)';
+            $conn->prepare("UPDATE agency_items SET item_name = ?, brand_name = ? WHERE TRIM(LOWER(item_name)) = TRIM(LOWER(?))")->execute([$new_wb_name, $new_wb_name, $old_wb_name]);
+            $conn->prepare("UPDATE inventory SET name = ? WHERE TRIM(LOWER(name)) = TRIM(LOWER(?))")->execute([$new_wb_name, $old_wb_name]);
+            $conn->prepare("UPDATE generic_mappings SET brand_name = ? WHERE TRIM(LOWER(brand_name)) = TRIM(LOWER(?))")->execute([$new_wb_name, $old_wb_name]);
+
             $rows_updated++;
         }
 
