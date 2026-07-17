@@ -5338,7 +5338,21 @@
                             </div>
                             <div class="form-group">
                                 <label style="display:block; margin-bottom: 5px; font-weight: 600;">Scan Fee (₹)</label>
-                                <input type="number" step="0.01" id="editRecordScanFee" class="form-control" style="width: 100%; box-sizing: border-box;" oninput="recalcEditTotal()">
+                                <datalist id="scanFeesList">
+                                    <option value="50"></option>
+                                    <option value="100"></option>
+                                    <option value="150"></option>
+                                    <option value="200"></option>
+                                    <option value="250"></option>
+                                    <option value="300"></option>
+                                    <option value="350"></option>
+                                    <option value="400"></option>
+                                    <option value="450"></option>
+                                    <option value="500"></option>
+                                    <option value="550"></option>
+                                    <option value="600"></option>
+                                </datalist>
+                                <input type="number" step="0.01" id="editRecordScanFee" list="scanFeesList" class="form-control" style="width: 100%; box-sizing: border-box;" oninput="recalcEditTotal()">
                             </div>
                             <div class="form-group" style="grid-column: span 2;">
                                 <label style="display:block; margin-bottom: 5px; font-weight: 600;">Scan Notes</label>
