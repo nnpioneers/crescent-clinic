@@ -71,6 +71,8 @@ function get_db()
         } else {
             // Run a one-time migration to convert existing male doctor records to 'Gents'
             $conn->exec("UPDATE users SET doctor_type='Gents' WHERE role='doctor' AND doctor_type != 'Gents' AND doctor_type != 'Lady'");
+            $conn->exec("UPDATE users SET token_prefix='G' WHERE role='doctor' AND doctor_type='Gents'");
+            $conn->exec("UPDATE users SET token_prefix='L' WHERE role='doctor' AND doctor_type='Lady'");
         }
 
         // Always run column migrations once per process to keep existing DBs up-to-date

@@ -3998,6 +3998,15 @@ if ($uri === '/api/management/user/save' && $method === 'POST') {
         $token_prefix = null;
     }
     
+    // ENFORCE STRICT PREFIX FOR DOCTORS
+    if ($role === 'doctor') {
+        if ($doctor_type === 'Gents') {
+            $token_prefix = 'G';
+        } elseif ($doctor_type === 'Lady' || $doctor_type === 'Ladies') {
+            $token_prefix = 'L';
+        }
+    }
+    
     $is_active = isset($_POST['is_active']) ? (int)$_POST['is_active'] : 1;
     
     $doctor_registration_number = $_POST['doctor_registration_number'] ?? null;
