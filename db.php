@@ -488,7 +488,8 @@ function generate_token($doctor_id)
     $prefix = $stmt->fetchColumn() ?: 'D';
     $prefix = strtoupper($prefix);
 
-    $stmt = $conn->prepare("SELECT token FROM patients WHERE doctor_id = ? AND DATE(created_at) = CURDATE()");
+    $today = date('Y-m-d');
+    $stmt = $conn->prepare("SELECT token FROM patients WHERE doctor_id = ? AND DATE(created_at) = '$today'");
     $stmt->execute([$doctor_id]);
 
     $rows = $stmt->fetchAll();

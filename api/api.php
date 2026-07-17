@@ -621,11 +621,13 @@ if ($uri === '/api/patients' && $method === 'GET') {
     $rows = [];
 
     if ($role === 'receptionist') {
-        $stmt = $conn->query("SELECT * FROM patients WHERE DATE(created_at) = CURDATE() ORDER BY created_at DESC");
+        $today = date('Y-m-d');
+        $stmt = $conn->query("SELECT * FROM patients WHERE DATE(created_at) = '$today' ORDER BY created_at DESC");
         $rows = $stmt->fetchAll();
     } elseif ($role === 'doctor') {
         $doctor_id = $_SESSION['doctor_id'];
-        $stmt = $conn->prepare("SELECT * FROM patients WHERE doctor_id=? AND DATE(created_at) = CURDATE() ORDER BY token ASC");
+        $today = date('Y-m-d');
+        $stmt = $conn->prepare("SELECT * FROM patients WHERE doctor_id=? AND DATE(created_at) = '$today' ORDER BY token ASC");
         $stmt->execute([$doctor_id]);
         $rows = $stmt->fetchAll();
     } elseif ($role === 'pharmacist') {
@@ -636,11 +638,12 @@ if ($uri === '/api/patients' && $method === 'GET') {
             pr.status as presc_status, pr.upt_card 
             FROM patients p JOIN prescriptions pr ON p.id=pr.patient_id 
             WHERE p.status IN ('prescribed','completed') 
-            AND DATE(p.created_at) = CURDATE() 
+            AND DATE(p.created_at) = '" . date('Y-m-d') . "' 
             ORDER BY pr.created_at DESC");
         $rows = $stmt->fetchAll();
     } elseif ($role === 'monitor') {
-        $stmt = $conn->query("SELECT id, name, token, doctor_id, doctor_type, status FROM patients WHERE DATE(created_at) = CURDATE() AND status IN ('waiting', 'prescribed') ORDER BY created_at ASC");
+        $today = date('Y-m-d');
+        $stmt = $conn->query("SELECT id, name, token, doctor_id, doctor_type, status FROM patients WHERE DATE(created_at) = '$today' AND status IN ('waiting', 'prescribed') ORDER BY created_at ASC");
         $rows = $stmt->fetchAll();
     }
 
@@ -3127,13 +3130,17 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
     $start_date = $_GET['start_date'] ?? null;
     $end_date = $_GET['end_date'] ?? null;
     
-    $date_filter = "created_at >= CURDATE() AND created_at < CURDATE() + INTERVAL 1 DAY";
+    $today_str = date('Y-m-d');
+    $date_filter = "created_at >= '$today_str 00:00:00' AND created_at <= '$today_str 23:59:59'";
     if ($period === 'yesterday') {
-        $date_filter = "created_at >= DATE_SUB(CURDATE(), INTERVAL 1 DAY) AND created_at < CURDATE()";
+        $yesterday_str = date('Y-m-d', strtotime('-1 day'));
+        $date_filter = "created_at >= '$yesterday_str 00:00:00' AND created_at <= '$yesterday_str 23:59:59'";
     } elseif ($period === 'weekly') {
-        $date_filter = "created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND created_at < CURDATE() + INTERVAL 1 DAY";
+        $last_week_str = date('Y-m-d', strtotime('-7 days'));
+        $date_filter = "created_at >= '$last_week_str 00:00:00' AND created_at <= '$today_str 23:59:59'";
     } elseif ($period === 'monthly') {
-        $date_filter = "created_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01') AND created_at < CURDATE() + INTERVAL 1 DAY";
+        $this_month_start = date('Y-m-01');
+        $date_filter = "created_at >= '$this_month_start 00:00:00' AND created_at <= '$today_str 23:59:59'";
     } elseif ($period === 'custom' && $start_date && $end_date) {
         $date_filter = "created_at >= '$start_date 00:00:00' AND created_at <= '$end_date 23:59:59'";
     }
