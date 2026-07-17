@@ -6425,6 +6425,80 @@ if ($uri === '/api/generics/delete-generic' && $method === 'POST') {
 }
 
 /**
+ * POST /api/generics/bulk-categorize
+ * Body: { generic_names: ["...", "..."], category: "..." }
+ * Updates the category for multiple generic medicines.
+ */
+if ($uri === '/api/generics/bulk-categorize' && $method === 'POST') {
+    enforce_api_auth(['pharmacist']);
+    $generic_names = $input['generic_names'] ?? [];
+    $category = $input['category'] ?? '';
+    
+    if (!is_array($generic_names) || empty($generic_names)) {
+        json_response(['error' => 'generic_names is required and must be a non-empty array'], 400);
+    }
+    if ($category === '') {
+        json_response(['error' => 'category is required'], 400);
+    }
+    
+    $conn = get_db();
+    try {
+        $conn->beginTransaction();
+
+        $rows_updated = 0;
+
+        $stmt = $conn->prepare("
+            UPDATE generic_mappings SET category = ? 
+            WHERE TRIM(LOWER(generic_name)) = TRIM(LOWER(?))
+        ");
+
+        // We also want to update the inventory items themselves to reflect the new category
+        $stmt_inv = $conn->prepare("
+            UPDATE inventory SET category = ? 
+            WHERE TRIM(LOWER(generic_name)) = TRIM(LOWER(?))
+        ");
+        
+        // We also want to update the agency_items
+        $stmt_agency = $conn->prepare("
+            UPDATE agency_items SET category = ? 
+            WHERE TRIM(LOWER(generic_name)) = TRIM(LOWER(?))
+        ");
+
+        foreach ($generic_names as $generic_name) {
+            $generic_name = trim($generic_name);
+            if ($generic_name === '') continue;
+
+            $stmt->execute([$category, $generic_name]);
+            $stmt_inv->execute([$category, $generic_name]);
+            $stmt_agency->execute([$category, $generic_name]);
+            $rows_updated++;
+        }
+
+        // Audit trail
+        $names_str = implode(', ', $generic_names);
+        $conn->prepare("
+            INSERT INTO agency_audit_trail
+                (user_id, action, table_name, record_id, old_value, new_value, details)
+            VALUES (?, 'GENERIC_BULK_CATEGORIZE', 'generic_mappings+inventory+agency_items', 0, NULL, ?, ?)
+        ")->execute([
+            $_SESSION['user_id'] ?? 0,
+            $category,
+            "Bulk categorized " . count($generic_names) . " generic medicines to $category."
+        ]);
+
+        $conn->commit();
+        json_response([
+            'success'     => true,
+            'message'     => "Selected items categorized successfully."
+        ]);
+    } catch (Exception $e) {
+        $conn->rollBack();
+        error_log("Bulk Categorize Error: " . $e->getMessage());
+        json_response(['error' => 'Failed to categorize generic medicines: ' . $e->getMessage()], 500);
+    }
+}
+
+/**
  * POST /api/generics/delete-multiple
  * Body: { generic_names: ["...", "..."] }
  * Clears the generic name (sets to NULL) for multiple generic medicines.

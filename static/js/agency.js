@@ -1974,12 +1974,21 @@ function gmDecodeAttr(str) {
 
 function updateBulkDeleteButton() {
     const btn = document.getElementById('gmBulkDeleteBtn');
+    const catSelect = document.getElementById('gmBulkCategorySelect');
+    const catBtn = document.getElementById('gmBulkCategoryBtn');
     if (!btn) return;
     if (gmSelectedItems.size > 0) {
         btn.style.display = 'inline-block';
         btn.textContent = `🗑️ Delete Selected (${gmSelectedItems.size})`;
+        if (catSelect) catSelect.style.display = 'inline-block';
+        if (catBtn) {
+            catBtn.style.display = 'inline-block';
+            catBtn.textContent = `Apply Category (${gmSelectedItems.size})`;
+        }
     } else {
         btn.style.display = 'none';
+        if (catSelect) catSelect.style.display = 'none';
+        if (catBtn) catBtn.style.display = 'none';
     }
 }
 
@@ -2046,6 +2055,43 @@ window.gmBulkDelete = async function() {
         }
     } catch (e) {
         toast(e.message || 'Failed to delete selected generic medicines.', 'error');
+    }
+};
+
+window.gmBulkCategorize = async function() {
+    if (gmSelectedItems.size === 0) return;
+    
+    const catSelect = document.getElementById('gmBulkCategorySelect');
+    const category = catSelect ? catSelect.value : '';
+    if (!category) {
+        toast('Please select a category first', 'error');
+        return;
+    }
+    
+    const count = gmSelectedItems.size;
+    const confirmMessage = `Are you sure you want to assign category "${category}" to ${count} selected Generic Medicines?`;
+    if (!confirm(confirmMessage)) {
+        return;
+    }
+    
+    try {
+        const genericNames = Array.from(gmSelectedItems);
+        const res = await api('/api/generics/bulk-categorize', {
+            method: 'POST',
+            body: { generic_names: genericNames, category: category }
+        });
+        
+        if (res.success) {
+            toast(res.message || 'Selected items categorized successfully.', 'success');
+            gmSelectedItems.clear();
+            if (catSelect) catSelect.value = '';
+            updateBulkDeleteButton();
+            loadGenericMedicines();
+        } else {
+            toast(res.error || 'Failed to categorize items.', 'error');
+        }
+    } catch (e) {
+        toast(e.message || 'Failed to categorize items.', 'error');
     }
 };
 
