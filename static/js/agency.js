@@ -1901,9 +1901,8 @@ function gmFilterList(query) {
 
 // Render the paginated list table
 function renderGmList() {
-    const start = (gmCurrentPage - 1) * gmPageSize;
-    const end = start + gmPageSize;
-    const paginatedItems = gmFilteredData.slice(start, end);
+    const start = 0;
+    const paginatedItems = gmFilteredData;
     const tbody = document.getElementById('gmListBody');
     const statFiltered = document.getElementById('gmStatFiltered');
     const paginationEl = document.getElementById('gmPagination');
@@ -1954,31 +1953,10 @@ function renderGmList() {
 
 // Render pagination controls
 function renderGmPagination() {
-    const totalPages = Math.ceil(gmFilteredData.length / gmPageSize);
     const container = document.getElementById('gmPagination');
-    if (!container) return;
-    if (totalPages <= 1) {
+    if (container) {
         container.innerHTML = '';
-        return;
     }
-
-    let html = '';
-    // Previous button
-    html += `<button class="btn btn-outline btn-sm" ${gmCurrentPage === 1 ? 'disabled style="opacity:0.5;"' : ''} onclick="gmGoToPage(${gmCurrentPage - 1})">Prev</button>`;
-
-    // Page numbers
-    for (let i = 1; i <= totalPages; i++) {
-        if (i === 1 || i === totalPages || (i >= gmCurrentPage - 2 && i <= gmCurrentPage + 2)) {
-            html += `<button class="btn btn-sm ${gmCurrentPage === i ? 'btn-primary' : 'btn-outline'}" onclick="gmGoToPage(${i})">${i}</button>`;
-        } else if (i === gmCurrentPage - 3 || i === gmCurrentPage + 3) {
-            html += `<span style="padding:0 4px; color:var(--text-light);">...</span>`;
-        }
-    }
-
-    // Next button
-    html += `<button class="btn btn-outline btn-sm" ${gmCurrentPage === totalPages ? 'disabled style="opacity:0.5;"' : ''} onclick="gmGoToPage(${gmCurrentPage + 1})">Next</button>`;
-
-    container.innerHTML = html;
 }
 
 function gmGoToPage(page) {
@@ -2006,9 +1984,7 @@ function updateBulkDeleteButton() {
 }
 
 window.gmToggleSelectAll = function(source) {
-    const start = (gmCurrentPage - 1) * gmPageSize;
-    const end = start + gmPageSize;
-    const paginatedItems = gmFilteredData.slice(start, end);
+    const paginatedItems = gmFilteredData;
     
     paginatedItems.forEach(item => {
         if (source.checked) {
@@ -2034,9 +2010,7 @@ window.gmOnRowSelect = function(cb) {
         gmSelectedItems.delete(generic);
     }
     
-    const start = (gmCurrentPage - 1) * gmPageSize;
-    const end = start + gmPageSize;
-    const paginatedItems = gmFilteredData.slice(start, end);
+    const paginatedItems = gmFilteredData;
     const selectAllCb = document.getElementById('gmSelectAll');
     if (selectAllCb) {
         const allVisibleSelected = paginatedItems.length > 0 && paginatedItems.every(item => gmSelectedItems.has(item.generic_name));
