@@ -978,7 +978,7 @@ function generatePrintableReport(data, period, start, end, format = 'print') {
 }
 
 function generateBackup() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('en-CA');
     exportReportCustom('custom', '2000-01-01', today, 'pdf');
 }
 

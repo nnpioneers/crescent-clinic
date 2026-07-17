@@ -644,8 +644,8 @@ function openAgencyPurcModal() {
     if (document.getElementById('agPurcSuppName')) document.getElementById('agPurcSuppName').value = '';
     if (document.getElementById('agPurcSupp')) document.getElementById('agPurcSupp').value = '';
     document.getElementById('agPurcInv').value = '';
-    document.getElementById('agPurcDate').value = new Date().toISOString().split('T')[0];
-    if (document.getElementById('agPurcInvDate')) document.getElementById('agPurcInvDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('agPurcDate').value = new Date().toLocaleDateString('en-CA');
+    if (document.getElementById('agPurcInvDate')) document.getElementById('agPurcInvDate').value = new Date().toLocaleDateString('en-CA');
     if (document.getElementById('agPurcPayment')) document.getElementById('agPurcPayment').value = 'Cash';
     if (document.getElementById('agPurcCreditDays')) document.getElementById('agPurcCreditDays').value = '0';
     if (document.getElementById('agPurcDueDate')) document.getElementById('agPurcDueDate').value = '';
@@ -657,7 +657,7 @@ function openAgencyPurcModal() {
     if (document.getElementById('agPurcLr')) document.getElementById('agPurcLr').value = '';
 
     if (document.getElementById('agPurcType')) document.getElementById('agPurcType').value = 'Regular';
-    if (document.getElementById('agPurcPaymentDate')) document.getElementById('agPurcPaymentDate').value = new Date().toISOString().split('T')[0];
+    if (document.getElementById('agPurcPaymentDate')) document.getElementById('agPurcPaymentDate').value = new Date().toLocaleDateString('en-CA');
     if (document.getElementById('agPurcTransactionId')) document.getElementById('agPurcTransactionId').value = '';
     if (document.getElementById('agPurcBankName')) document.getElementById('agPurcBankName').value = '';
 
@@ -858,8 +858,8 @@ async function handleOcrScan(input) {
 
                 if (document.getElementById('agPurcSupp')) document.getElementById('agPurcSupp').value = suppId;
                 if (document.getElementById('agPurcInv')) document.getElementById('agPurcInv').value = res.supplier.invoice_number || '';
-                if (document.getElementById('agPurcDate')) document.getElementById('agPurcDate').value = res.supplier.date || new Date().toISOString().split('T')[0];
-                if (document.getElementById('agPurcInvDate')) document.getElementById('agPurcInvDate').value = res.supplier.date || new Date().toISOString().split('T')[0];
+                if (document.getElementById('agPurcDate')) document.getElementById('agPurcDate').value = res.supplier.date || new Date().toLocaleDateString('en-CA');
+                if (document.getElementById('agPurcInvDate')) document.getElementById('agPurcInvDate').value = res.supplier.date || new Date().toLocaleDateString('en-CA');
             }
 
             if (document.getElementById('agPurcDocName') && res.doctor_name) document.getElementById('agPurcDocName').value = res.doctor_name;
@@ -1517,7 +1517,7 @@ async function openAgencyReturnModal() {
     agencySuppliersData.forEach(s => { suppOptions += `<option value="${s.id}">${s.name}</option>`; });
     document.getElementById('agReturnSupplier').innerHTML = suppOptions;
 
-    document.getElementById('agReturnDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('agReturnDate').value = new Date().toLocaleDateString('en-CA');
     document.getElementById('agReturnRef').value = '';
     document.getElementById('agReturnReason').value = '';
     document.getElementById('agReturnItemsBody').innerHTML = '';
