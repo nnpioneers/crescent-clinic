@@ -638,15 +638,38 @@ window.onunhandledrejection = function(event) {
                 ? `<button class="btn btn-outline btn-sm" style="margin-top:8px; font-size:0.78rem; color:var(--accent); border-color:var(--accent);"
                        onclick="event.stopPropagation(); editDoctorFee(${p.id}, '${p.name.replace(/'/g,"\\'")}')">✏️ Edit Fee</button>`
                 : '';
+            let detailsHtml = '';
+            if (p.status === 'waiting') {
+                detailsHtml = `
+                        <div class="pc-meta">ID: ${p.patient_id || '-'}</div>
+                        <div class="pc-meta">${p.age} yrs • ${p.gender} • ${p.phone}</div>
+                        <div class="pc-meta">${p.complaint || 'No complaint noted'}</div>
+                `;
+            } else {
+                let parts = [];
+                if (p.bp && p.bp.trim() !== '') parts.push(`BP: ${p.bp}`);
+                if (p.pulse && p.pulse.trim() !== '') parts.push(`Pulse: ${p.pulse}`);
+                if (p.temp && p.temp.trim() !== '') parts.push(`Temp: ${p.temp}`);
+                if (p.consultation_fee !== null && p.consultation_fee !== undefined) parts.push(`Fee: ₹${p.consultation_fee}`);
+                if (p.injection_details && p.injection_details.trim() !== '') parts.push(`Injection`);
+                
+                let detailStr = parts.join(' • ');
+                let prescriptionNotes = p.prescription_text && p.prescription_text.trim() !== '' ? 
+                    `<div class="pc-meta" style="margin-top:4px; font-style:italic;">Notes: ${p.prescription_text}</div>` : '';
+                    
+                detailsHtml = `
+                        <div class="pc-meta" style="color:var(--text-primary); font-weight:500; font-size:0.85rem;">${detailStr || 'Details updated'}</div>
+                        ${prescriptionNotes}
+                `;
+            }
+
             return `
             <div class="patient-card" onclick="openPrescribe(${p.id})">
                 <div class="pc-info">
                     <div class="pc-token">${p.token}</div>
                     <div>
                         <div class="pc-name">${p.name}</div>
-                        <div class="pc-meta">ID: ${p.patient_id || '-'}</div>
-                        <div class="pc-meta">${p.age} yrs • ${p.gender} • ${p.phone}</div>
-                        <div class="pc-meta">${p.complaint || 'No complaint noted'}</div>
+                        ${detailsHtml}
                     </div>
                 </div>
                 <div style="display:flex; flex-direction:column; align-items:flex-end;">

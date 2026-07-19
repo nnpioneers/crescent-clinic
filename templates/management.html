@@ -3860,6 +3860,7 @@
                 </div>
 
                 <h4 style="margin:0 0 8px; font-size:0.95em; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.04em;">Profit Breakdown</h4>
+                <div style="overflow-x: auto; width: 100%;">
                 <table class="data-table">
                     <tbody>
                         <tr><td>Doctor Fees</td><td style="text-align:right; color:var(--emerald);">&#8377;${res.splits.doctor_profit.toFixed(2)}</td></tr>
@@ -3882,6 +3883,7 @@
                         <tr><td>Scan Fees</td><td style="text-align:right; color:var(--emerald);">&#8377;${res.splits.scan_profit.toFixed(2)}</td></tr>
                     </tbody>
                 </table>
+                </div>
                 <div style="font-size:0.78em; color:var(--text-light); font-style:italic; margin-top:10px;">
                     * Realized Profit = Payment received minus proportional purchase cost.
                 </div>
@@ -3930,6 +3932,7 @@
                     <div style="margin-bottom:15px;">
                         <h4>Direct Medicine Revenue Breakdown</h4>
                     </div>
+                    <div style="overflow-x: auto; width: 100%;">
                     <table class="data-table">
                         <thead>
                             <tr>
@@ -4042,7 +4045,8 @@
                                 <td></td>
                             </tr>
                         </tfoot>
-                    </table>`;
+                    </table>
+                    </div>`;
                 document.getElementById('medicineBreakdownModalBody').innerHTML = html;
                 openModal('medicineBreakdownModal');
             }).catch(e => {
@@ -4081,6 +4085,7 @@
                     <div style="margin-bottom:15px;">
                         <h4>Direct Medicine Profit Breakdown</h4>
                     </div>
+                    <div style="overflow-x: auto; width: 100%;">
                     <table class="data-table">
                         <thead>
                             <tr>
@@ -4181,7 +4186,8 @@
                                 <td style="text-align:right; color:var(--emerald);">₹${totalProfitSum.toFixed(2)}</td>
                             </tr>
                         </tfoot>
-                    </table>`;
+                    </table>
+                    </div>`;
                 document.getElementById('medicineBreakdownModalBody').innerHTML = html;
                 openModal('medicineBreakdownModal');
             }).catch(e => {
@@ -4193,6 +4199,7 @@
             if (!window.currentAnalyticsData) return;
             const res = window.currentAnalyticsData;
             let html = `
+                <div style="overflow-x: auto; width: 100%;">
                 <table class="data-table">
                     <thead><tr><th>Doctor</th><th style="text-align:right">Revenue Generated</th></tr></thead>
                     <tbody>
@@ -4204,7 +4211,7 @@
                 hasDocs = true;
             }
             if (!hasDocs) html += `<tr><td colspan="2" style="text-align:center">No doctor fees generated</td></tr>`;
-            html += `</tbody></table>`;
+            html += `</tbody></table></div>`;
             document.getElementById('doctorBreakdownModalBody').innerHTML = html;
             openModal('doctorBreakdownModal');
         }
@@ -4215,6 +4222,7 @@
 
             // Tab 1: Per-Medicine Breakdown
             let medItemsHtml = `
+                <div style="overflow-x: auto; width: 100%;">
                 <table class="data-table">
                     <thead>
                         <tr>
@@ -4272,10 +4280,11 @@
                         </tfoot>
                 `;
             }
-            medItemsHtml += `</table>`;
+            medItemsHtml += `</table></div>`;
 
             // Tab 2: Payment Details per Prescription Transaction
             let payHtml = `
+                <div style="overflow-x: auto; width: 100%;">
                 <table class="data-table">
                     <thead>
                         <tr>
@@ -4370,7 +4379,7 @@
                         </tfoot>
                 `;
             }
-            payHtml += `</table>`;
+            payHtml += `</table></div>`;
 
             // Build tabbed HTML
             const html = `

@@ -628,7 +628,13 @@ if ($uri === '/api/patients' && $method === 'GET') {
     } elseif ($role === 'doctor') {
         $doctor_id = $_SESSION['doctor_id'];
         $today = date('Y-m-d');
-        $stmt = $conn->prepare("SELECT * FROM patients WHERE doctor_id=? AND DATE(created_at) = '$today' ORDER BY token ASC");
+        $stmt = $conn->prepare("
+            SELECT p.*, pr.consultation_fee, pr.scan_fee, pr.prescription_text, pr.upt_card, pr.injection_details, pr.iv_details 
+            FROM patients p 
+            LEFT JOIN prescriptions pr ON p.id = pr.patient_id 
+            WHERE p.doctor_id=? AND DATE(p.created_at) = '$today' 
+            ORDER BY p.token ASC
+        ");
         $stmt->execute([$doctor_id]);
         $rows = $stmt->fetchAll();
     } elseif ($role === 'pharmacist') {
@@ -3347,7 +3353,9 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
         if ($row['injection_details']) {
             $name = trim($row['injection_details']);
             $norm_name = normalize_medicine_name($name);
-            $cost = $inv_costs[$name] ?? $inv_costs[$norm_name] ?? 0;
+            $exact_cost = $inv_costs[$name] ?? 0;
+            $norm_cost = $inv_costs[$norm_name] ?? 0;
+            $cost = max($exact_cost, $norm_cost);
             $inj_cost_calc += $cost;
             $rev = (float)$row['injection_cost'];
             
@@ -3372,7 +3380,9 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
         if ($row['iv_details']) {
             $name = trim($row['iv_details']);
             $norm_name = normalize_medicine_name($name);
-            $cost = $inv_costs[$name] ?? $inv_costs[$norm_name] ?? 0;
+            $exact_cost = $inv_costs[$name] ?? 0;
+            $norm_cost = $inv_costs[$norm_name] ?? 0;
+            $cost = max($exact_cost, $norm_cost);
             $iv_cost_calc += $cost;
             $rev = (float)$row['iv_cost'];
             
@@ -3431,7 +3441,9 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
             $live_unit_cost = 0.0;
             if ($batch_id && isset($inv_batches[$batch_id])) {
                 $live_unit_cost = (float)$inv_batches[$batch_id]['purchase_price'] / max(1, (int)$inv_batches[$batch_id]['tablets_per_strip']);
-            } else {
+            }
+            
+            if ($live_unit_cost <= 0) {
                 $norm_m_name = normalize_medicine_name($name);
                 $exact_cost = $inv_costs[$name] ?? 0;
                 $norm_cost = $inv_costs[$norm_m_name] ?? 0;
@@ -3653,10 +3665,14 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
         foreach ($meds_array as &$m) {
             $name = $m['name'] ?? 'Unknown';
             $batch_id = $m['batch_id'] ?? null;
+            $live_unit_cost = 0.0;
             if ($batch_id && isset($inv_batches[$batch_id])) {
                 $unit_cost = $inv_batches[$batch_id]['purchase_price'];
                 $tps = max(1, (int)$inv_batches[$batch_id]['tablets_per_strip']);
-            } else {
+                $live_unit_cost = (float)$unit_cost / $tps;
+            }
+            
+            if ($live_unit_cost <= 0) {
                 $norm_m_name = normalize_medicine_name($name);
                 $exact_cost = $inv_costs[$name] ?? 0;
                 $norm_cost = $inv_costs[$norm_m_name] ?? 0;
@@ -3667,8 +3683,9 @@ if ($uri === '/api/management/analytics' && $method === 'GET') {
                 } else {
                     $tps = max(1, (int)($inv_tps[$name] ?? $inv_tps[$norm_m_name] ?? 1));
                 }
+                $live_unit_cost = $unit_cost / $tps;
             }
-            $actual_unit_cost = $unit_cost / $tps;
+            $actual_unit_cost = $live_unit_cost;
             $qty = (float)($m['qty'] ?? 0) - (float)($m['returned_qty'] ?? 0);
             $m['cost'] = $actual_unit_cost * $qty;
             $m['profit'] = ((float)($m['amount'] ?? 0) - (float)($m['returned_amount'] ?? 0)) - $m['cost'];

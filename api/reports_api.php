@@ -205,10 +205,11 @@ if ($action === 'get_reports') {
                     $inv_price_cache['b'.$batch_id] = $s->fetch() ?: ['purchase_price'=>0,'tablets_per_strip'=>1];
                 }
                 $irow = $batch_id ? ($inv_price_cache['b'.$batch_id] ?? null) : null;
-                if (!$irow) {
+                if (!$irow || (float)$irow['purchase_price'] <= 0) {
                     if (!isset($inv_price_cache[$lname])) {
-                        $s = $conn->prepare("SELECT purchase_price, tablets_per_strip FROM inventory WHERE name=? ORDER BY expiry_date ASC LIMIT 1");
-                        $s->execute([$lname]);
+                        // Get global max cost
+                        $s = $conn->prepare("SELECT MAX(purchase_price) as purchase_price, MAX(tablets_per_strip) as tablets_per_strip FROM inventory WHERE name=? OR name=? GROUP BY name ORDER BY purchase_price DESC LIMIT 1");
+                        $s->execute([$lname, normalize_medicine_name($lname)]);
                         $inv_price_cache[$lname] = $s->fetch() ?: ['purchase_price'=>0,'tablets_per_strip'=>1];
                     }
                     $irow = $inv_price_cache[$lname];
