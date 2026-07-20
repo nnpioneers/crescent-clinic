@@ -1428,6 +1428,87 @@ window.onunhandledrejection = function(event) {
         setTimeout(() => { nameInput.focus(); }, 10);
     };
 
+    window.addFreeMedicineRow = function () {
+        const container = $('#freeMedicineRows');
+        const row = document.createElement('div');
+        row.className = 'medicine-row free-medicine-item';
+        row.style.display = 'grid';
+        row.style.gridTemplateColumns = '3fr 1fr 1fr 30px';
+        row.style.gap = '10px';
+        row.style.marginBottom = '10px';
+        row.style.alignItems = 'end';
+        row.innerHTML = `
+            <div class="form-group" style="margin:0; position:relative;">
+                <label style="font-size: 0.65rem; color: #15803d; margin-bottom: 2px; display: block;">Medicine Name</label>
+                <input type="text" placeholder="Free medicine name" class="med-name" autocomplete="off" oninput="searchMedicine(this)" onblur="autoFillMedData(this)" style="border-color:#86efac; background:#f0fdf4;">
+                <input type="hidden" class="med-batch-id" value="">
+                <input type="hidden" class="med-tps" value="0">
+                <input type="hidden" class="med-price" value="0">
+                <input type="hidden" class="med-amount" value="0">
+                <div class="med-suggestions" style="display:none; position:absolute; top:100%; left:0; width:100%; background:var(--bg-card); border:1px solid var(--border); z-index:1000; border-radius:4px; max-height:200px; overflow-y:auto; box-shadow:0 8px 16px rgba(0,0,0,0.5);"></div>
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label style="font-size: 0.65rem; color: #15803d; margin-bottom: 2px; display: block;">Tablets</label>
+                <input type="number" placeholder="0" class="med-qty" min="0" value="0" style="border-color:#86efac; background:#f0fdf4;">
+            </div>
+            <div class="form-group med-strips-group" style="margin:0;">
+                <label style="font-size: 0.65rem; color: #15803d; margin-bottom: 2px; display: block;">Strips</label>
+                <input type="number" placeholder="0" class="med-strips" min="0" value="0" style="border-color:#86efac; background:#f0fdf4;">
+            </div>
+            <button class="btn-remove-med" onclick="this.parentElement.remove();" style="margin-bottom: 8px; background:#fef2f2; color:#ef4444; border:1px solid #fca5a5; padding: 6px;">✕</button>
+        `;
+        const nameInput = row.querySelector('.med-name');
+        nameInput.addEventListener('keydown', function (e) {
+            const suggBox = row.querySelector('.med-suggestions');
+            if (suggBox.style.display === 'block') {
+                const items = suggBox.querySelectorAll('.med-sugg-item');
+                let activeIdx = Array.from(items).findIndex(i => i.classList.contains('active-sugg'));
+
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    if (activeIdx < items.length - 1) activeIdx++;
+                    else activeIdx = 0;
+                    items.forEach(i => { i.classList.remove('active-sugg'); i.style.background = ''; });
+                    if (items[activeIdx]) {
+                        items[activeIdx].classList.add('active-sugg');
+                        items[activeIdx].style.background = 'var(--bg-hover)';
+                        items[activeIdx].scrollIntoView({ block: 'nearest' });
+                    }
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    if (activeIdx > 0) activeIdx--;
+                    else activeIdx = items.length - 1;
+                    items.forEach(i => { i.classList.remove('active-sugg'); i.style.background = ''; });
+                    if (items[activeIdx]) {
+                        items[activeIdx].classList.add('active-sugg');
+                        items[activeIdx].style.background = 'var(--bg-hover)';
+                        items[activeIdx].scrollIntoView({ block: 'nearest' });
+                    }
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (activeIdx >= 0 && items[activeIdx]) {
+                        items[activeIdx].click();
+                    } else if (items.length > 0) {
+                        items[0].click();
+                    }
+                }
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                row.querySelector('.med-qty').focus();
+            }
+        });
+        
+        row.querySelector('.med-qty').addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); row.querySelector('.med-strips').focus(); }
+        });
+        row.querySelector('.med-strips').addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); addFreeMedicineRow(); }
+        });
+        
+        container.appendChild(row);
+        setTimeout(() => { nameInput.focus(); }, 10);
+    };
+
     window.addPharmacyInjectionRow = function () {
         const container = $('#pharmacyInjectionRows');
         if (!container) return;
@@ -2062,9 +2143,11 @@ window.onunhandledrejection = function(event) {
         
         try {
             const rows = $$('#medicineRows .medicine-row');
+            const freeRowsForBrand = $$('#freeMedicineRows .free-medicine-item');
         
         // --- STEP 0: Auto-create any new brands ---
-        for (let row of rows) {
+        const allRows = [...rows, ...freeRowsForBrand];
+        for (let row of allRows) {
             const genericName = row.querySelector('.med-name').value.trim();
             const brandInput = row.querySelector('.med-new-brand');
             if (brandInput) {
@@ -2111,6 +2194,20 @@ window.onunhandledrejection = function(event) {
             // "Without Brand" medicines where pricing/stock is filled in later.
             // Only skip rows that are completely empty (no name at all).
             if (name) medicines.push({ name, qty: totalQty, unit_price, amount, batch_id, tps, strips, tablets });
+        });
+        
+        const freeRows = $$('#freeMedicineRows .free-medicine-item');
+        freeRows.forEach(row => {
+            const name = row.querySelector('.med-name').value.trim();
+            const tps = parseInt(row.querySelector('.med-tps').value) || 1;
+            const strips = parseFloat(row.querySelector('.med-strips').value) || 0;
+            const tablets = parseFloat(row.querySelector('.med-qty').value) || 0;
+
+            const totalQty = (strips * tps) + tablets;
+            const amount = 0; // Free
+            const unit_price = 0; // Free
+            const batch_id = row.querySelector('.med-batch-id') ? row.querySelector('.med-batch-id').value : '';
+            if (name) medicines.push({ name: name + " (FREE)", qty: totalQty, unit_price, amount, batch_id, tps, strips, tablets });
         });
 
         let injCost = 0;
