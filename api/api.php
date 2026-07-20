@@ -2350,6 +2350,31 @@ if ($uri === '/api/inventory/add' && $method === 'POST') {
     // $name = trim(str_ireplace([' (Without Brand)', ' (Sold Without Brand)'], '', $name));
     $batch_number = trim($input['batch_number'] ?? 'BATCH-01');
     $stock = (int)($input['stock'] ?? 0);
+    
+    $generic_name = trim($input['generic_name'] ?? '');
+    if ($generic_name === '') {
+        $generic_name = get_mapped_generic_name($conn, $name);
+    }
+
+    // Auto-adjust generic negative stock when adding a new brand
+    if ($generic_name !== '' && $stock > 0) {
+        $placeholder_name = trim(str_ireplace([' (Without Brand)'], '', $generic_name)) . ' (Without Brand)';
+        // Check if there is negative stock on the generic placeholder
+        $stmt_gen = $conn->prepare("SELECT id, stock FROM inventory WHERE name = ? AND stock < 0");
+        $stmt_gen->execute([$placeholder_name]);
+        $gen_row = $stmt_gen->fetch(PDO::FETCH_ASSOC);
+        if ($gen_row) {
+            $neg_stock = (int)$gen_row['stock']; // This is negative
+            if ($stock + $neg_stock >= 0) {
+                $stock = $stock + $neg_stock;
+                $conn->prepare("UPDATE inventory SET stock = 0 WHERE id = ?")->execute([$gen_row['id']]);
+            } else {
+                $conn->prepare("UPDATE inventory SET stock = stock + ? WHERE id = ?")->execute([$stock, $gen_row['id']]);
+                $stock = 0;
+            }
+        }
+    }
+
     $purchase_price = max(0, (float)($input['purchase_price'] ?? $input['cost_price'] ?? 0));
     $selling_price = max(0, (float)($input['selling_price'] ?? 0));
     $mrp = max(0, (float)($input['mrp'] ?? $selling_price));
@@ -2362,10 +2387,7 @@ if ($uri === '/api/inventory/add' && $method === 'POST') {
     $min_stock = max(0, (int)($input['min_stock'] ?? 0));
     $row_location = trim($input['row_location'] ?? '');
     $col_location = trim($input['col_location'] ?? '');
-    $generic_name = trim($input['generic_name'] ?? '');
-    if ($generic_name === '') {
-        $generic_name = get_mapped_generic_name($conn, $name);
-    }
+    
     $brand_name = trim($input['brand_name'] ?? $name);
     // $brand_name = trim(str_ireplace([' (Without Brand)', ' (Sold Without Brand)'], '', $brand_name));
     $agency_name = trim($input['agency_name'] ?? '');
@@ -2505,7 +2527,7 @@ if ($uri === '/api/inventory/update' && $method === 'POST') {
     $is_without_brand = !empty($input['is_without_brand']);
 
     // Always verify server-side: fetch the original record
-    $orig_stmt = $conn->prepare("SELECT name, batch_number, generic_name, purchase_price, tablets_per_strip FROM inventory WHERE id = ?");
+    $orig_stmt = $conn->prepare("SELECT name, batch_number, generic_name, purchase_price, tablets_per_strip, stock FROM inventory WHERE id = ?");
     $orig_stmt->execute([$id]);
     $orig = $orig_stmt->fetch(PDO::FETCH_ASSOC);
     $orig_name  = $orig['name']  ?? '';
@@ -2528,6 +2550,13 @@ if ($uri === '/api/inventory/update' && $method === 'POST') {
 
     $batch_number = trim($input['batch_number'] ?? '');
     $stock = (int)($input['stock'] ?? 0);
+    $orig_stock = (int)($orig['stock'] ?? 0);
+
+    // Auto-adjust negative stock when user enters purchased stock amount
+    if ($orig_stock < 0 && $stock > 0) {
+        $stock = $stock + $orig_stock;
+    }
+
     $purchase_price = (float)($input['purchase_price'] ?? 0);
     $selling_price = (float)($input['selling_price'] ?? 0);
     $mrp = (float)($input['mrp'] ?? $selling_price);
