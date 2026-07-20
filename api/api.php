@@ -1083,7 +1083,10 @@ if (($uri === '/api/add_medicines' || $uri === '/api/direct_pharmacy') && $metho
         };
 
         if ($injection_cost > 0 && $injection_details) {
-            $deduct_stock_by_name($injection_details, 'INJ', $injection_cost);
+            $injs = array_map('trim', explode(',', $injection_details));
+            foreach ($injs as $inj) {
+                if ($inj) $deduct_stock_by_name($inj, 'INJ', $injection_cost);
+            }
         }
         if ($iv_cost > 0 && $iv_details) {
             $deduct_stock_by_name($iv_details, 'IV Fluids', $iv_cost);
@@ -1911,7 +1914,10 @@ if ($uri === '/api/management/edit_record' && $method === 'POST') {
         };
         
         if ($injection_cost > 0 && $injection_details) {
-            $deduct_stock_by_name($injection_details, 'INJ', $injection_cost);
+            $injs = array_map('trim', explode(',', $injection_details));
+            foreach ($injs as $inj) {
+                if ($inj) $deduct_stock_by_name($inj, 'INJ', $injection_cost);
+            }
         }
         if ($iv_cost > 0 && $iv_details) {
             $deduct_stock_by_name($iv_details, 'IV Fluids', $iv_cost);
@@ -2445,6 +2451,9 @@ if ($uri === '/api/inventory/add' && $method === 'POST') {
     if ($purchase_price > 0) {
         $actual_unit_cost = ((int)$tablets_per_strip > 0) ? ((float)$purchase_price / (int)$tablets_per_strip) : (float)$purchase_price;
         backfill_historical_medicine_cost($conn, $name, $actual_unit_cost, 0);
+        if ($generic_name !== '' && normalize_medicine_name($generic_name) !== normalize_medicine_name($name)) {
+            backfill_historical_medicine_cost($conn, $generic_name, $actual_unit_cost, 0);
+        }
     }
 
     json_response(['success' => true]);
@@ -2487,15 +2496,25 @@ function backfill_historical_medicine_cost($conn, $med_name, $unit_cost, $old_un
             
             $non_med_qty = 0;
             // Check in injection_details
-            $inj_name_norm = normalize_medicine_name($row['injection_details'] ?? '');
-            if ($inj_name_norm === $med_name_norm && $inj_name_norm !== '') {
-                $non_med_qty += 1; // Injection is 1 unit
+            if (!empty($row['injection_details'])) {
+                $injs = array_map('trim', explode(',', $row['injection_details']));
+                foreach ($injs as $inj) {
+                    $inj_norm = normalize_medicine_name($inj);
+                    if ($inj_norm === $med_name_norm && $inj_norm !== '') {
+                        $non_med_qty += 1; // Injection is 1 unit
+                    }
+                }
             }
             
             // Check in iv_details
-            $iv_name_norm = normalize_medicine_name($row['iv_details'] ?? '');
-            if ($iv_name_norm === $med_name_norm && $iv_name_norm !== '') {
-                $non_med_qty += 1; // IV is 1 unit
+            if (!empty($row['iv_details'])) {
+                $ivs = array_map('trim', explode(',', $row['iv_details']));
+                foreach ($ivs as $iv) {
+                    $iv_norm = normalize_medicine_name($iv);
+                    if ($iv_norm === $med_name_norm && $iv_norm !== '') {
+                        $non_med_qty += 1; // IV is 1 unit
+                    }
+                }
             }
             
             $non_med_cost_diff = $cost_diff_per_unit * $non_med_qty;
