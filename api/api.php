@@ -692,32 +692,51 @@ if ($uri === '/api/update_doctor_fee' && $method === 'POST') {
     enforce_api_auth(['doctor']);
     $input = json_decode(file_get_contents('php://input'), true);
     $patient_id   = (int)($input['patient_id'] ?? 0);
-    $new_fee      = (float)($input['consultation_fee'] ?? 0);
-
+    
     if (!$patient_id) {
         json_response(['error' => 'Invalid patient ID'], 400);
         exit;
     }
-    if ($new_fee < 0) {
-        json_response(['error' => 'Fee cannot be negative'], 400);
+
+    $conn = get_db();
+    $stmt = $conn->prepare("SELECT consultation_fee, injection_cost, scan_fee, iv_cost, upt_cost FROM prescriptions WHERE patient_id = ?");
+    $stmt->execute([$patient_id]);
+    $old = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$old) {
+        json_response(['success' => true, 'message' => 'No prescription record found to update']);
         exit;
     }
 
-    $conn = get_db();
-    // Update prescription consultation fee
-    $stmt = $conn->prepare("UPDATE prescriptions SET 
-        total_amount = total_amount - consultation_fee + ?, 
-        balance_amount = balance_amount - consultation_fee + ?, 
-        consultation_fee = ? 
-        WHERE patient_id = ?");
-    $stmt->execute([$new_fee, $new_fee, $new_fee, $patient_id]);
+    $c_fee = isset($input['consultation_fee']) ? (float)$input['consultation_fee'] : (float)$old['consultation_fee'];
+    $i_cost = isset($input['injection_cost']) ? (float)$input['injection_cost'] : (float)$old['injection_cost'];
+    $s_fee = isset($input['scan_fee']) ? (float)$input['scan_fee'] : (float)$old['scan_fee'];
+    $iv_cost = isset($input['iv_cost']) ? (float)$input['iv_cost'] : (float)$old['iv_cost'];
+    $u_cost = isset($input['upt_cost']) ? (float)$input['upt_cost'] : (float)$old['upt_cost'];
 
-    if ($stmt->rowCount() === 0) {
-        // No prescription row yet — that's fine, just acknowledge
-        json_response(['success' => true, 'message' => 'No prescription record found to update']);
-    } else {
-        json_response(['success' => true, 'new_fee' => $new_fee]);
+    if ($c_fee < 0 || $i_cost < 0 || $s_fee < 0 || $iv_cost < 0 || $u_cost < 0) {
+        json_response(['error' => 'Fees cannot be negative'], 400);
+        exit;
     }
+
+    $diff = ($c_fee - (float)$old['consultation_fee']) + 
+            ($i_cost - (float)$old['injection_cost']) + 
+            ($s_fee - (float)$old['scan_fee']) + 
+            ($iv_cost - (float)$old['iv_cost']) + 
+            ($u_cost - (float)$old['upt_cost']);
+
+    $stmt = $conn->prepare("UPDATE prescriptions SET 
+        total_amount = total_amount + ?, 
+        balance_amount = balance_amount + ?, 
+        consultation_fee = ?,
+        injection_cost = ?,
+        scan_fee = ?,
+        iv_cost = ?,
+        upt_cost = ?
+        WHERE patient_id = ?");
+    $stmt->execute([$diff, $diff, $c_fee, $i_cost, $s_fee, $iv_cost, $u_cost, $patient_id]);
+
+    json_response(['success' => true, 'updated_fees' => true]);
 }
 
 // ═══════════════════════════════════════════

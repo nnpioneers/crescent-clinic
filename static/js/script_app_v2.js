@@ -647,11 +647,8 @@ window.onunhandledrejection = function(event) {
                 `;
             } else {
                 let parts = [];
-                if (p.bp && p.bp.trim() !== '') parts.push(`BP: ${p.bp}`);
-                if (p.pulse && p.pulse.trim() !== '') parts.push(`Pulse: ${p.pulse}`);
-                if (p.temp && p.temp.trim() !== '') parts.push(`Temp: ${p.temp}`);
-                if (p.consultation_fee !== null && p.consultation_fee !== undefined) parts.push(`Fee: ₹${p.consultation_fee}`);
-                if (p.injection_details && p.injection_details.trim() !== '') parts.push(`Injection`);
+                if (p.consultation_fee !== null && p.consultation_fee !== undefined) parts.push(`Doctor Fee: ₹${p.consultation_fee}`);
+                if (p.injection_details && p.injection_details.trim() !== '') parts.push(`Injection: ${p.injection_details}`);
                 
                 let detailStr = parts.join(' • ');
                 let prescriptionNotes = p.prescription_text && p.prescription_text.trim() !== '' ? 
@@ -886,9 +883,13 @@ window.onunhandledrejection = function(event) {
     // ─── Edit Doctor Fee (after patient moved to Pharmacy) ───────────────────────
     window.editDoctorFee = async function (patientId, patientName) {
         let currentFee = 0;
+        let currentInjFee = 0;
+        let currentScanFee = 0;
         try {
             const p = await api('/api/patient/' + patientId);
             currentFee = p.consultation_fee || 0;
+            currentInjFee = p.injection_cost || 0;
+            currentScanFee = p.scan_fee || 0;
         } catch(e) { /* use 0 */ }
 
         const existing = document.getElementById('editFeeModal');
@@ -901,48 +902,71 @@ window.onunhandledrejection = function(event) {
         overlay.innerHTML = `
             <div class="modal" style="max-width:380px;">
                 <div class="modal-header">
-                    <h3>✏️ Edit Doctor Fee — ${patientName}</h3>
+                    <h3>✏️ Edit Fee — ${patientName}</h3>
                     <button class="modal-close" onclick="document.getElementById('editFeeModal').remove()">✕</button>
                 </div>
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label for="editFeeInput" style="font-size:0.9rem; font-weight:600;">Consultation Fee (₹)</label>
-                        <input type="number" id="editFeeInput" value="${currentFee}" min="0" step="0.01"
-                            style="font-size:1.4rem; font-weight:700; text-align:center; padding:12px;"
+                <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label for="editDocFeeInput" style="font-size:0.9rem; font-weight:600;">Doctor Fee (₹)</label>
+                        <input type="number" id="editDocFeeInput" value="${currentFee}" min="0" step="0.01"
+                            style="font-size:1.1rem; font-weight:700; padding:8px;"
                             onfocus="if(this.value==='0') this.value='';"
-                            onblur="if(this.value==='') this.value='0';"
-                            onkeydown="if(event.key==='Enter') document.getElementById('editFeeSaveBtn').click();">
+                            onblur="if(this.value==='') this.value='0';">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label for="editInjFeeInput" style="font-size:0.9rem; font-weight:600;">Injection Fee (₹)</label>
+                        <input type="number" id="editInjFeeInput" value="${currentInjFee}" min="0" step="0.01"
+                            style="font-size:1.1rem; font-weight:700; padding:8px;"
+                            onfocus="if(this.value==='0') this.value='';"
+                            onblur="if(this.value==='') this.value='0';">
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label for="editScanFeeInput" style="font-size:0.9rem; font-weight:600;">Scan Fee (₹)</label>
+                        <input type="number" id="editScanFeeInput" value="${currentScanFee}" min="0" step="0.01"
+                            style="font-size:1.1rem; font-weight:700; padding:8px;"
+                            onfocus="if(this.value==='0') this.value='';"
+                            onblur="if(this.value==='') this.value='0';">
                     </div>
                     <p style="font-size:0.82rem; color:var(--text-secondary); margin-top:8px; margin-bottom:0;">
-                        This updates the consultation fee for this patient's prescription immediately.
+                        This updates the fees for this patient's prescription immediately.
                     </p>
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-outline" onclick="document.getElementById('editFeeModal').remove()">Cancel</button>
                     <button class="btn btn-success" id="editFeeSaveBtn" onclick="saveEditedDoctorFee(${patientId})">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                        Save Fee
+                        Save Fees
                     </button>
                 </div>
             </div>`;
         document.body.appendChild(overlay);
-        setTimeout(() => { const inp = document.getElementById('editFeeInput'); if (inp) { inp.focus(); inp.select(); } }, 80);
+        setTimeout(() => { const inp = document.getElementById('editDocFeeInput'); if (inp) { inp.focus(); inp.select(); } }, 80);
     };
 
     window.saveEditedDoctorFee = async function (patientId) {
-        const inp = document.getElementById('editFeeInput');
-        if (!inp) return;
-        const newFee = parseFloat(inp.value) || 0;
+        const docInp = document.getElementById('editDocFeeInput');
+        const injInp = document.getElementById('editInjFeeInput');
+        const scanInp = document.getElementById('editScanFeeInput');
+        
+        const c_fee = docInp ? parseFloat(docInp.value) || 0 : 0;
+        const i_cost = injInp ? parseFloat(injInp.value) || 0 : 0;
+        const s_fee = scanInp ? parseFloat(scanInp.value) || 0 : 0;
+
         const btn = document.getElementById('editFeeSaveBtn');
         if (btn) btn.disabled = true;
         try {
             const res = await api('/api/update_doctor_fee', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ patient_id: patientId, consultation_fee: newFee })
+                body: JSON.stringify({ 
+                    patient_id: patientId, 
+                    consultation_fee: c_fee,
+                    injection_cost: i_cost,
+                    scan_fee: s_fee
+                })
             });
             if (res.success) {
-                toast('Doctor fee updated to ₹' + newFee.toFixed(2) + '!', 'success');
+                toast('Fees updated successfully!', 'success');
                 document.getElementById('editFeeModal').remove();
                 loadPatients();
             } else {
