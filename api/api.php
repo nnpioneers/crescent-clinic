@@ -558,9 +558,12 @@ if ($uri === '/api/register_patient' && $method === 'POST') {
     $db_id = $conn->lastInsertId();
     
     // Permanent ID Logic
-    $stmt = $conn->prepare("SELECT patient_id FROM patients WHERE name=? AND phone=? AND id != ? AND patient_id IS NOT NULL AND patient_id != '' LIMIT 1");
-    $stmt->execute([$input['name'], $input['phone'], $db_id]);
-    $existing = $stmt->fetch();
+    $existing = false;
+    if (!empty($input['name']) || !empty($input['phone'])) {
+        $stmt = $conn->prepare("SELECT patient_id FROM patients WHERE name=? AND phone=? AND id != ? AND patient_id IS NOT NULL AND patient_id != '' LIMIT 1");
+        $stmt->execute([$input['name'], $input['phone'], $db_id]);
+        $existing = $stmt->fetch();
+    }
     
     if ($existing && !empty($existing['patient_id'])) {
         $ccs_id = $existing['patient_id'];

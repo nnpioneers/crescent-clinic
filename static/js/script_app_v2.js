@@ -488,7 +488,7 @@ window.onunhandledrejection = function(event) {
                 manual_token: $('#patManualToken') ? $('#patManualToken').value : ''
             };
 
-            if (!data.name || !data.phone || !data.gender || !data.doctor_id) {
+            if (!data.doctor_id) {
                 toast('Please fill all required fields', 'error');
                 return;
             }
