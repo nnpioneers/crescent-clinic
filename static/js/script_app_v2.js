@@ -1195,6 +1195,9 @@ window.onunhandledrejection = function(event) {
             const patient = window.currentPatients.find(p => p.presc_id === prescId);
             if (patient) {
                 $('#medModalFee').value = patient.consultation_fee || 0;
+                if ($('#medModalFeeContainer')) {
+                    $('#medModalFeeContainer').style.display = (patient.consultation_fee > 0) ? 'block' : 'none';
+                }
                 $('#medModalScan').value = patient.scan_fee || 0;
                 if ($('#medModalScanType')) $('#medModalScanType').value = patient.scan_type || '';
                 if ($('#medModalScanNotes')) $('#medModalScanNotes').value = patient.scan_notes || '';
