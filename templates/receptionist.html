@@ -126,15 +126,11 @@
                                     <input type="text" id="patName" required placeholder="Patient full name">
                                 </div>
                                 <div class="form-group">
-                                    <label for="patPhone">Phone *</label>
-                                    <input type="text" id="patPhone" required placeholder="Phone number">
-                                </div>
-                            </div>
-                            <div class="form-row">
-                                <div class="form-group">
                                     <label for="patAge">Age *</label>
                                     <input type="number" id="patAge" required min="0" max="150" placeholder="Age">
                                 </div>
+                            </div>
+                            <div class="form-row">
                                 <div class="form-group">
                                     <label for="patGender">Gender *</label>
                                     <select id="patGender" required>
@@ -143,25 +139,20 @@
                                         <option value="Female">Female</option>
                                     </select>
                                 </div>
+                                <div class="form-group">
+                                    <label for="patTemp">Temperature</label>
+                                    <input type="text" id="patTemp" placeholder="e.g. 98.6°F">
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label for="patAddress">Address</label>
-                                <input type="text" id="patAddress" placeholder="Address">
-                            </div>
-                            <div class="form-group">
-                                <label for="patComplaint">Chief Complaint</label>
-                                <textarea id="patComplaint" placeholder="Describe the complaint"></textarea>
-                            </div>
-
-                            <h3 style="margin: 20px 0 12px; font-size: 0.95rem;">Vitals</h3>
                             <div class="form-row">
                                 <div class="form-group">
                                     <label for="patBP">Blood Pressure</label>
                                     <input type="text" id="patBP" placeholder="e.g. 120/80">
                                 </div>
                                 <div class="form-group">
-                                    <label for="patTemp">Temperature</label>
-                                    <input type="text" id="patTemp" placeholder="e.g. 98.6°F">
+                                    <label for="patSpO2">SpO2 (%)</label>
+                                    <input type="number" id="patSpO2" placeholder="Enter SpO2 (e.g., 98)" min="70"
+                                        max="100">
                                 </div>
                             </div>
                             <div class="form-row">
@@ -174,16 +165,25 @@
                                     <input type="text" id="patWeight" placeholder="e.g. 70 kg">
                                 </div>
                             </div>
+
+                            <h3 style="margin: 20px 0 12px; font-size: 0.95rem;">Additional Details</h3>
                             <div class="form-row">
+                                <div class="form-group">
+                                    <label for="patPhone">Phone *</label>
+                                    <input type="text" id="patPhone" required placeholder="Phone number">
+                                </div>
                                 <div class="form-group">
                                     <label for="patHeight">Height</label>
                                     <input type="text" id="patHeight" placeholder="e.g. 170 cm">
                                 </div>
-                                <div class="form-group">
-                                    <label for="patSpO2">SpO2 (%)</label>
-                                    <input type="number" id="patSpO2" placeholder="Enter SpO2 (e.g., 98)" min="70"
-                                        max="100">
-                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="patAddress">Address</label>
+                                <input type="text" id="patAddress" placeholder="Address">
+                            </div>
+                            <div class="form-group">
+                                <label for="patComplaint">Chief Complaint</label>
+                                <textarea id="patComplaint" placeholder="Describe the complaint"></textarea>
                             </div>
                             <div class="form-group">
                                 <label for="patDoctor">Assign Doctor *</label>
