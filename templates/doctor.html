@@ -141,8 +141,14 @@
                 <div class="responsive-grid">
                     <div class="form-group">
                         <label for="feeInput">Consultation Fee (₹)</label>
-                        <input type="number" id="feeInput" placeholder="Enter fee" value="0" min="0"
-                            onfocus="if(this.value==='0') this.value='';" onblur="if(this.value==='') this.value='0';">
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="number" id="feeInput" placeholder="Enter fee" value="0" min="0"
+                                onfocus="if(this.value==='0') this.value='';" onblur="if(this.value==='') this.value='0';" style="flex: 1;">
+                            <label style="display: inline-flex; align-items: center; gap: 4px; font-weight: 500; cursor: pointer; white-space: nowrap;">
+                                <input type="checkbox" id="noFeesDoctorCheck" style="width: 16px; height: 16px; margin: 0;" onchange="document.getElementById('feeInput').disabled = this.checked; if(this.checked) document.getElementById('feeInput').value = '0';">
+                                No Fees
+                            </label>
+                        </div>
                     </div>
                     <div class="form-group" id="scanFeeContainer"
                         style="display: none; background: var(--bg-card); border: 1px solid var(--border); padding: 16px; border-radius: 8px; margin-bottom: 16px;">

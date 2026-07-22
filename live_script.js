@@ -867,11 +867,17 @@ window.onunhandledrejection = function(event) {
                 <div class="modal-body">
                     <div class="form-group">
                         <label for="editFeeInput" style="font-size:0.9rem; font-weight:600;">Consultation Fee (₹)</label>
-                        <input type="number" id="editFeeInput" value="${currentFee}" min="0" step="0.01"
-                            style="font-size:1.4rem; font-weight:700; text-align:center; padding:12px;"
-                            onfocus="if(this.value==='0') this.value='';"
-                            onblur="if(this.value==='') this.value='0';"
-                            onkeydown="if(event.key==='Enter') document.getElementById('editFeeSaveBtn').click();">
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <input type="number" id="editFeeInput" value="${currentFee}" min="0" step="0.01"
+                                style="font-size:1.4rem; font-weight:700; text-align:center; padding:12px; flex: 1;"
+                                onfocus="if(this.value==='0') this.value='';"
+                                onblur="if(this.value==='') this.value='0';"
+                                onkeydown="if(event.key==='Enter') document.getElementById('editFeeSaveBtn').click();">
+                            <label style="display: inline-flex; align-items: center; gap: 4px; font-weight: 500; cursor: pointer; white-space: nowrap;">
+                                <input type="checkbox" id="noFeesEditCheck" style="width: 16px; height: 16px; margin: 0;" onchange="document.getElementById('editFeeInput').disabled = this.checked; if(this.checked) document.getElementById('editFeeInput').value = '0';">
+                                No Fees
+                            </label>
+                        </div>
                     </div>
                     <p style="font-size:0.82rem; color:var(--text-secondary); margin-top:8px; margin-bottom:0;">
                         This updates the consultation fee for this patient's prescription immediately.
@@ -2011,7 +2017,7 @@ window.onunhandledrejection = function(event) {
         const uptCost = ($('#pharmacyCheckUPT') && $('#pharmacyCheckUPT').checked) ? (parseFloat($('#medModalUPTCost').value) || 0) : 0;
 
         const hasFees = (parseFloat($('#medModalFee').value) || 0) > 0 || (parseFloat($('#medModalScan').value) || 0) > 0 || injCost > 0 || uptCost > 0;
-        if (medicines.length === 0 && !hasFees) return toast('Add at least one medicine or fee', 'error');
+        // Validation removed to allow saving with no medicines and no fees as requested
 
         const cashChecked = $('#payCashCheck').checked;
         const gpayChecked = $('#payGPayCheck').checked;

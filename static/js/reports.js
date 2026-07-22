@@ -22,7 +22,7 @@ async function loadReportDashboard(period = null, force = false) {
 
     try {
         const url = `/reports_api.php?action=get_reports&period=${period}&start=${start}&end=${end}&_=${new Date().getTime()}`;
-        const res = await fetch(url).then(r => r.json());
+        const res = await api(url);
 
         reportData = res;
         renderReportDashboard(res);
@@ -325,7 +325,7 @@ async function exportReport(format) {
         if (btn) { btn.innerHTML = 'Generating...'; btn.disabled = true; }
 
         const url = `/reports_api.php?action=get_print_report&period=${period}&start=${start}&end=${end}&_=${new Date().getTime()}`;
-        const data = await fetch(url).then(r => r.json());
+        const data = await api(url);
 
         if (!data || !data.executive) {
             throw new Error("Invalid or empty report payload received from server.");
@@ -986,7 +986,7 @@ async function exportReportCustom(period, start, end, format) {
     try {
         Swal.fire({ title: 'Preparing Full Backup...', text: 'Fetching all records, please wait.', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
         const url = `/reports_api.php?action=get_print_report&period=${period}&start=${start}&end=${end}&_=${new Date().getTime()}`;
-        const data = await fetch(url).then(r => r.json());
+        const data = await api(url);
         Swal.close();
 
         if (!data || !data.executive) {
@@ -1518,14 +1518,10 @@ async function saveAutoBackupSettings() {
     formData.append('whatsapp_api_token', customToken);
 
     try {
-        const response = await fetch('/reports_api.php?action=save_backup_settings', {
+        const resData = await api('/reports_api.php?action=save_backup_settings', {
             method: 'POST',
-            headers: {
-                'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
-            },
             body: formData
         });
-        const resData = await response.json();
         if (resData.success) {
             closeModal('autoBackupSettingsModal');
             toast('Auto Backup Settings Saved Successfully!');

@@ -16,6 +16,16 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'management') {
 
 $conn = get_db();
 
+if (!function_exists('normalize_medicine_name')) {
+    function normalize_medicine_name($name) {
+        $name = str_replace("\xEF\xBB\xBF", "", $name);
+        $name = str_replace(chr(0xEF).chr(0xBB).chr(0xBF), "", $name);
+        $name = str_ireplace([' (without brand)', ' (sold without brand)'], '', $name);
+        $name = preg_replace('/\s*\([A-Za-z]{2,4}\)/', '', $name);
+        return trim(strtolower($name));
+    }
+}
+
 $action = $_GET['action'] ?? 'get_reports';
 
 if ($action === 'get_reports') {
