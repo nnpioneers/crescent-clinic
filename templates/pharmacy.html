@@ -455,7 +455,7 @@
                         style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px;">
                         <div
                             style="font-size: 0.9rem; margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;"><span
+                            <div id="bdDocRow" style="display: flex; justify-content: space-between; margin-bottom: 6px;"><span
                                     style="color: var(--text-muted);">Doctor Fee:</span><span id="bdDocFee"
                                     style="color: var(--text-primary);">₹0.00</span></div>
                             <div style="display: flex; justify-content: space-between; margin-bottom: 6px;"><span
@@ -1299,7 +1299,7 @@
 
     <div class="toast-container" id="toastContainer"></div>
     {% include 'partials/inventory_modals.html' %}
-    <script src="{{ url_for('static', filename='js/script_app_v2.js') }}?v=20260720_v1" defer></script>
+    <script src="{{ url_for('static', filename='js/script_app_v2.js') }}?v=20260722_v2" defer></script>
     <script src="{{ url_for('static', filename='js/inventory.js') }}?v=20260713_03" defer></script>
     <script src="{{ url_for('static', filename='js/agency.js') }}?v=20260713_02" defer></script>
 </body>

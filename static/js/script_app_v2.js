@@ -2050,6 +2050,9 @@ window.onunhandledrejection = function(event) {
         // Breakdown Update
         if ($('#bdMedTotal')) $('#bdMedTotal').textContent = '₹' + medTotal.toFixed(2);
         if ($('#bdDocFee')) $('#bdDocFee').textContent = '₹' + consultationFee.toFixed(2);
+        if ($('#bdDocRow')) {
+            $('#bdDocRow').style.display = (consultationFee > 0) ? 'flex' : 'none';
+        }
 
         if ($('#bdScanRow')) {
             if (scanFee > 0) { $('#bdScanRow').style.display = 'flex'; $('#bdScanFee').textContent = '₹' + scanFee.toFixed(2); }
@@ -2227,8 +2230,7 @@ window.onunhandledrejection = function(event) {
         const uptCost = ($('#pharmacyCheckUPT') && $('#pharmacyCheckUPT').checked) ? (parseFloat($('#medModalUPTCost').value) || 0) : 0;
 
         const hasFees = (parseFloat($('#medModalFee').value) || 0) > 0 || (parseFloat($('#medModalScan').value) || 0) > 0 || injCost > 0 || uptCost > 0;
-        if (medicines.length === 0 && !hasFees) return toast('Add at least one medicine or fee', 'error');
-
+        // Validation removed to allow saving with no medicines and no fees as requested
         const cashChecked = $('#payCashCheck').checked;
         const gpayChecked = $('#payGPayCheck').checked;
         const phonepeChecked = $('#payPhonePeCheck') ? $('#payPhonePeCheck').checked : false;
@@ -2761,7 +2763,7 @@ window.onunhandledrejection = function(event) {
                     { label: 'UPT Card Fee:', val: parseFloat(p.upt_cost) || 0 }
                 ];
 
-                const activeFees = otherFees.filter(f => f.val > 0 || f.label === 'Doctor Fee:' || f.label === 'Medicine Total:');
+                const activeFees = otherFees.filter(f => f.val > 0 || f.label === 'Medicine Total:');
 
                 // Calculate height dynamically to prevent clipping
                 const numMeds = medicines.length;
