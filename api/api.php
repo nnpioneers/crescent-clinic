@@ -2408,31 +2408,50 @@ if ($uri === '/api/inventory/add' && $method === 'POST') {
         $supplier_id = $supp_stmt->fetchColumn() ?: null;
     }
 
-    // MySQL-compatible duplicate key update
-    $sql = "INSERT INTO inventory (item_code, name, generic_name, brand_name, agency_name, category, hsn_code, batch_number, mfg_date, expiry_date, mrp, purchase_price, selling_price, opening_stock, stock, min_stock, tablets_per_strip, row_location, col_location, supplier_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE 
-                stock = stock + VALUES(stock),
-                opening_stock = opening_stock + VALUES(opening_stock),
-                purchase_price = VALUES(purchase_price),
-                selling_price = VALUES(selling_price),
-                mrp = VALUES(mrp),
-                expiry_date = VALUES(expiry_date),
-                item_code = VALUES(item_code),
-                mfg_date = VALUES(mfg_date),
-                category = VALUES(category),
-                hsn_code = VALUES(hsn_code),
-                min_stock = VALUES(min_stock),
-                tablets_per_strip = VALUES(tablets_per_strip),
-                row_location = VALUES(row_location),
-                col_location = VALUES(col_location),
-                generic_name = VALUES(generic_name),
-                brand_name = VALUES(brand_name),
-                agency_name = VALUES(agency_name),
-                supplier_id = VALUES(supplier_id)";
-    
-    $stmt = $conn->prepare($sql);
-    $stmt->execute([$item_code, $name, $generic_name, $brand_name, $agency_name, $category, $hsn_code, $batch_number, $mfg_date, $expiry_date, $mrp, $purchase_price, $selling_price, $stock, $stock, $min_stock, $tablets_per_strip, $row_location, $col_location, $supplier_id]);
+    // Universal duplicate check (name + batch_number)
+    $chk_stmt = $conn->prepare("SELECT id FROM inventory WHERE TRIM(LOWER(name)) = TRIM(LOWER(?)) AND TRIM(LOWER(batch_number)) = TRIM(LOWER(?))");
+    $chk_stmt->execute([$name, $batch_number]);
+    $existing = $chk_stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($existing) {
+        $sql = "UPDATE inventory SET 
+            stock = stock + ?,
+            opening_stock = opening_stock + ?,
+            purchase_price = ?,
+            selling_price = ?,
+            mrp = ?,
+            expiry_date = ?,
+            item_code = ?,
+            mfg_date = ?,
+            category = ?,
+            hsn_code = ?,
+            min_stock = ?,
+            tablets_per_strip = ?,
+            row_location = ?,
+            col_location = ?,
+            generic_name = ?,
+            brand_name = ?,
+            agency_name = ?,
+            supplier_id = ?
+            WHERE id = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->execute([
+            $stock, $stock, $purchase_price, $selling_price, $mrp, $expiry_date,
+            $item_code, $mfg_date, $category, $hsn_code, $min_stock,
+            $tablets_per_strip, $row_location, $col_location,
+            $generic_name, $brand_name, $agency_name, $supplier_id, 
+            $existing['id']
+        ]);
+    } else {
+        $sql = "INSERT INTO inventory (item_code, name, generic_name, brand_name, agency_name, category, hsn_code, batch_number, mfg_date, expiry_date, mrp, purchase_price, selling_price, opening_stock, stock, min_stock, tablets_per_strip, row_location, col_location, supplier_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        $stmt = $conn->prepare($sql);
+        $stmt->execute([
+            $item_code, $name, $generic_name, $brand_name, $agency_name, $category, $hsn_code, $batch_number, 
+            $mfg_date, $expiry_date, $mrp, $purchase_price, $selling_price, $stock, $stock, $min_stock, 
+            $tablets_per_strip, $row_location, $col_location, $supplier_id
+        ]);
+    }
     
     // Auto-save new category to agency_categories
     if (!empty($category)) {
