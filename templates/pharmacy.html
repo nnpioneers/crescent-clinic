@@ -828,14 +828,14 @@
                     
                     <h4 style="margin-bottom: 15px; border-bottom: 2px solid var(--primary); padding-bottom: 6px; color: var(--primary);">Medical Procedures & Cards</h4>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 20px;">
-                        <div class="form-group" style="position: relative;">
-                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">Injection Details</label>
-                            <input type="text" id="editRecordInjDetails" class="form-control" autocomplete="off" oninput="window.searchInventoryCategory('Injection', this)" style="width: 100%; box-sizing: border-box;">
-                            <div class="med-suggestions" style="display: none; position: absolute; background: white; border: 1px solid var(--border); z-index: 10; width: 90%; max-height: 200px; overflow-y: auto; box-shadow: var(--shadow);"></div>
-                        </div>
-                        <div class="form-group">
-                            <label style="display:block; margin-bottom: 5px; font-weight: 600;">Injection Cost (₹)</label>
-                            <input type="number" step="0.01" id="editRecordInjCost" class="form-control" style="width: 100%; box-sizing: border-box;" oninput="recalcEditTotal()">
+                        <div class="form-group" style="grid-column: span 2; position: relative; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
+                                <label style="margin: 0; font-weight: 600; color: #0f172a;">Injection Details</label>
+                                <button type="button" class="btn btn-outline btn-sm" onclick="window.addEditRecordInjectionRow && window.addEditRecordInjectionRow()" style="padding: 2px 8px; font-size: 0.75rem;">+ Add Injection</button>
+                            </div>
+                            <div id="editRecordInjectionRows"></div>
+                            <input type="hidden" id="editRecordInjDetails" value="">
+                            <input type="hidden" id="editRecordInjCost" value="0">
                         </div>
                         <div class="form-group" style="position: relative;">
                             <label style="display:block; margin-bottom: 5px; font-weight: 600;">IV Details</label>
@@ -1006,8 +1006,12 @@
             }
             
             // Populate procedures
-            document.getElementById('editRecordInjDetails').value = record.injection_details || '';
-            document.getElementById('editRecordInjCost').value = parseFloat(record.injection_cost || 0);
+            if (typeof window.renderEditRecordInjections === 'function') {
+                window.renderEditRecordInjections(record.injection_details, record.injection_cost);
+            } else {
+                document.getElementById('editRecordInjDetails').value = record.injection_details || '';
+                document.getElementById('editRecordInjCost').value = parseFloat(record.injection_cost || 0);
+            }
             document.getElementById('editRecordIvDetails').value = record.iv_details || '';
             document.getElementById('editRecordIvCost').value = parseFloat(record.iv_cost || 0);
             document.getElementById('editRecordUptCard').checked = (record.upt_card == 1);

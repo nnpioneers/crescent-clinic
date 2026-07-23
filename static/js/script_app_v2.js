@@ -1701,6 +1701,102 @@ window.onunhandledrejection = function(event) {
         setTimeout(() => { row.querySelector('.inj-name').focus(); }, 10);
     };
 
+    window.addEditRecordInjectionRow = function(name = '', cost = 0) {
+        const container = $('#editRecordInjectionRows');
+        if (!container) return;
+        const row = document.createElement('div');
+        row.className = 'edit-inj-row';
+        row.style.display = 'grid';
+        row.style.gridTemplateColumns = '2fr 1fr 30px';
+        row.style.gap = '10px';
+        row.style.marginBottom = '10px';
+        row.style.alignItems = 'end';
+        const injId = 'editInjName_' + Date.now() + Math.floor(Math.random() * 1000);
+        row.innerHTML = `
+            <div class="form-group" style="margin:0; position:relative;">
+                <label style="font-size: 0.65rem; color: var(--text-muted); margin-bottom: 2px; display: block;">Injection Name</label>
+                <input type="text" placeholder="Enter injection name" class="inj-name form-control" id="${injId}" autocomplete="off" oninput="searchInventoryCategory('Injection', this); window.recalcEditRecordInjections();" value="${name.replace(/"/g, '&quot;')}">
+                <div class="med-suggestions" style="display:none; position:absolute; top:100%; left:0; width:100%; z-index:1000; background:var(--bg-card); border:1px solid var(--border); border-radius:4px; max-height:200px; overflow-y:auto; box-shadow:0 8px 16px rgba(0,0,0,0.5);"></div>
+            </div>
+            <div class="form-group" style="margin:0;">
+                <label style="font-size: 0.65rem; color: var(--text-muted); margin-bottom: 2px; display: block;">Amount (₹)</label>
+                <input type="number" placeholder="0" class="inj-cost form-control" value="${cost}" oninput="window.recalcEditRecordInjections()">
+            </div>
+            <button type="button" class="btn btn-outline btn-sm" onclick="this.parentElement.remove(); window.recalcEditRecordInjections();" style="margin-bottom: 0px; padding: 6px 10px; color: var(--danger); border-color: var(--danger); height: 38px;">✕</button>
+        `;
+
+        row.querySelector('.inj-name').addEventListener('keydown', function (e) {
+            const suggBox = row.querySelector('.med-suggestions');
+            if (suggBox.style.display === 'block') {
+                const items = suggBox.querySelectorAll('.med-sugg-item');
+                let activeIdx = Array.from(items).findIndex(i => i.classList.contains('active-sugg'));
+                if (e.key === 'ArrowDown') { e.preventDefault(); if (activeIdx < items.length - 1) activeIdx++; else activeIdx = 0; items.forEach(i => { i.classList.remove('active-sugg'); i.style.background = ''; }); if (items[activeIdx]) { items[activeIdx].classList.add('active-sugg'); items[activeIdx].style.background = 'var(--bg-hover)'; items[activeIdx].scrollIntoView({ block: 'nearest' }); } }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); if (activeIdx > 0) activeIdx--; else activeIdx = items.length - 1; items.forEach(i => { i.classList.remove('active-sugg'); i.style.background = ''; }); if (items[activeIdx]) { items[activeIdx].classList.add('active-sugg'); items[activeIdx].style.background = 'var(--bg-hover)'; items[activeIdx].scrollIntoView({ block: 'nearest' }); } }
+                else if (e.key === 'Enter') { e.preventDefault(); if (activeIdx >= 0 && items[activeIdx]) items[activeIdx].click(); else if (items.length > 0) items[0].click(); }
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                row.querySelector('.inj-cost').focus();
+            }
+        });
+
+        row.querySelector('.inj-cost').addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                window.addEditRecordInjectionRow();
+            }
+        });
+
+        container.appendChild(row);
+        window.recalcEditRecordInjections();
+    };
+
+    window.recalcEditRecordInjections = function() {
+        const container = $('#editRecordInjectionRows');
+        if (!container) return;
+        
+        let totalCost = 0;
+        let details = [];
+        
+        container.querySelectorAll('.edit-inj-row').forEach(row => {
+            const name = row.querySelector('.inj-name').value.trim();
+            const cost = parseFloat(row.querySelector('.inj-cost').value) || 0;
+            if (name) {
+                details.push({ name, cost });
+                totalCost += cost;
+            }
+        });
+        
+        let jsonStr = '';
+        if (details.length > 0) {
+            jsonStr = JSON.stringify(details);
+        }
+        
+        if ($('#editRecordInjDetails')) $('#editRecordInjDetails').value = jsonStr;
+        if ($('#editRecordInjCost')) $('#editRecordInjCost').value = totalCost;
+        if (typeof window.recalcEditTotal === 'function') window.recalcEditTotal();
+    };
+
+    window.renderEditRecordInjections = function(jsonStr, fallbackCost) {
+        const container = $('#editRecordInjectionRows');
+        if (container) container.innerHTML = '';
+        
+        if ($('#editRecordInjDetails')) $('#editRecordInjDetails').value = jsonStr || '';
+        if ($('#editRecordInjCost')) $('#editRecordInjCost').value = fallbackCost || 0;
+        
+        if (jsonStr && jsonStr !== '[]') {
+            try {
+                let parsed = JSON.parse(jsonStr);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    parsed.forEach(inj => window.addEditRecordInjectionRow(inj.name, inj.cost || 0));
+                } else {
+                    window.addEditRecordInjectionRow(jsonStr, fallbackCost || 0);
+                }
+            } catch (e) {
+                window.addEditRecordInjectionRow(jsonStr, fallbackCost || 0);
+            }
+        }
+    };
+
     // ─── Pharmacy medicine search — direct API call with 200ms debounce ───────────────────────────
     let _medSearchTimer = null;
 
@@ -2055,7 +2151,9 @@ window.onunhandledrejection = function(event) {
 
         // Find corresponding cost input
         let costInput = null;
-        if (PAGE_ROLE === 'pharmacist') {
+        if (category === 'Injection' && input.closest('.edit-inj-row')) {
+            costInput = input.closest('.edit-inj-row').querySelector('.inj-cost');
+        } else if (PAGE_ROLE === 'pharmacist') {
             if (category === 'Injection') {
                 const row = input.closest('.medicine-row');
                 if (row) costInput = row.querySelector('.inj-cost');
@@ -2063,7 +2161,11 @@ window.onunhandledrejection = function(event) {
             }
             else if (category === 'IV') costInput = $('#medModalIVCost');
         } else if (PAGE_ROLE === 'doctor') {
-            if (category === 'Injection') costInput = $('#doctorInjectionCost');
+            if (category === 'Injection') {
+                const row = input.closest('.doc-inj-row');
+                if (row) costInput = row.querySelector('.inj-cost');
+                else costInput = $('#doctorInjectionCost');
+            }
             else if (category === 'IV') costInput = $('#doctorIVCost');
             else if (category === 'Scan') costInput = $('#scanFeeInput');
         }
