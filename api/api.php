@@ -787,16 +787,38 @@ if ($uri === '/api/prescribe' && $method === 'POST') {
     }
 
     $conn = get_db();
-    $stmt = $conn->prepare("INSERT INTO prescriptions (
-            patient_id, doctor_id, doctor_name, doctor_type, consultation_fee, scan_fee, scan_type, scan_notes,
-            diagnosis, diagnosis_photo, prescription_text, prescription_photo, upt_card,
-            injection_details, iv_details, injection_cost, iv_cost
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
-    $stmt->execute([
-        $patient_id, $doctor_id, $doctor_name, $_SESSION['doctor_type'], $consultation_fee, $scan_fee, $scan_type, $scan_notes,
-        $diagnosis, $diag_photo_path, $prescription_text, $presc_photo_path, $upt_card,
-        $injection_details, $iv_details, $injection_cost, $iv_cost
-    ]);
+    
+    $check = $conn->prepare("SELECT id, diagnosis_photo, prescription_photo FROM prescriptions WHERE patient_id = ?");
+    $check->execute([$patient_id]);
+    $existing = $check->fetch(PDO::FETCH_ASSOC);
+
+    if ($existing) {
+        if (!$diag_photo_path) $diag_photo_path = $existing['diagnosis_photo'];
+        if (!$presc_photo_path) $presc_photo_path = $existing['prescription_photo'];
+
+        $stmt = $conn->prepare("UPDATE prescriptions SET
+            consultation_fee=?, scan_fee=?, scan_type=?, scan_notes=?,
+            diagnosis=?, diagnosis_photo=?, prescription_text=?, prescription_photo=?, upt_card=?,
+            injection_details=?, iv_details=?, injection_cost=?, iv_cost=?
+            WHERE patient_id=?");
+        $stmt->execute([
+            $consultation_fee, $scan_fee, $scan_type, $scan_notes,
+            $diagnosis, $diag_photo_path, $prescription_text, $presc_photo_path, $upt_card,
+            $injection_details, $iv_details, $injection_cost, $iv_cost,
+            $patient_id
+        ]);
+    } else {
+        $stmt = $conn->prepare("INSERT INTO prescriptions (
+                patient_id, doctor_id, doctor_name, doctor_type, consultation_fee, scan_fee, scan_type, scan_notes,
+                diagnosis, diagnosis_photo, prescription_text, prescription_photo, upt_card,
+                injection_details, iv_details, injection_cost, iv_cost
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+        $stmt->execute([
+            $patient_id, $doctor_id, $doctor_name, $_SESSION['doctor_type'], $consultation_fee, $scan_fee, $scan_type, $scan_notes,
+            $diagnosis, $diag_photo_path, $prescription_text, $presc_photo_path, $upt_card,
+            $injection_details, $iv_details, $injection_cost, $iv_cost
+        ]);
+    }
 
     $now = date('Y-m-d H:i:s');
     $stmt = $conn->prepare("UPDATE patients SET status='prescribed' WHERE id=?");

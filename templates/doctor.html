@@ -236,21 +236,10 @@
 
                 <div id="inputInjectionContainer" class="form-group"
                     style="display: none; transition: all 0.3s ease; position: relative;">
-                    <div style="display: flex; gap: 10px; align-items: flex-end;">
-                        <div style="flex: 1; position: relative;">
-                            <label for="inputInjection">Injection Details</label>
-                            <input type="text" id="inputInjection" placeholder="Enter injection name / details"
-                                autocomplete="off" oninput="searchInventoryCategory('Injection', this)">
-                            <div id="injectionSuggestions" class="med-suggestions"
-                                style="display:none; position:absolute; top:100%; left:0; width:100%; z-index:1000; background:var(--bg-card); border:1px solid var(--border); border-radius:4px; max-height:200px; overflow-y:auto; box-shadow:0 8px 16px rgba(0,0,0,0.5);">
-                            </div>
-                        </div>
-                        <div style="width: 100px;">
-                            <label>Cost (₹)</label>
-                            <input type="number" id="doctorInjectionCost" placeholder="0"
-                                style="background: var(--bg-body); color: var(--text-primary); border: 1px solid var(--border);">
-                        </div>
-                    </div>
+                    <div id="doctorInjectionRows"></div>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="addDoctorInjectionRow()" style="margin-top: 8px;">
+                        + Add Item
+                    </button>
                 </div>
 
 

@@ -686,14 +686,16 @@ window.onunhandledrejection = function(event) {
             }
 
             if ($('#checkInjection')) {
+                if ($('#doctorInjectionRows')) $('#doctorInjectionRows').innerHTML = '';
                 if (p.injection_details) {
                     $('#checkInjection').checked = true;
                     $('#inputInjectionContainer').style.display = 'block';
-                    $('#inputInjection').value = p.injection_details;
+                    if (typeof addDoctorInjectionRow === 'function') {
+                        addDoctorInjectionRow(p.injection_details, p.injection_cost || 0);
+                    }
                 } else {
                     $('#checkInjection').checked = false;
                     $('#inputInjectionContainer').style.display = 'none';
-                    $('#inputInjection').value = '';
                 }
                 $('#checkInjection').disabled = !isWaiting;
                 if ($('#inputInjection')) $('#inputInjection').disabled = !isWaiting;
@@ -748,7 +750,11 @@ window.onunhandledrejection = function(event) {
         if (type === 'Injection') {
             const checked = $('#checkInjection').checked;
             $('#inputInjectionContainer').style.display = checked ? 'block' : 'none';
-            if (!checked) $('#inputInjection').value = '';
+            if (checked && $('#doctorInjectionRows') && $('#doctorInjectionRows').children.length === 0 && typeof addDoctorInjectionRow === 'function') {
+                addDoctorInjectionRow();
+            } else if (!checked && $('#doctorInjectionRows')) {
+                $('#doctorInjectionRows').innerHTML = '';
+            }
         } else if (type === 'Scan') {
             const checked = $('#checkScan').checked;
             $('#scanFeeContainer').style.display = checked ? 'block' : 'none';
@@ -784,9 +790,20 @@ window.onunhandledrejection = function(event) {
         }
 
         if ($('#checkInjection') && $('#checkInjection').checked) {
-            let val = $('#inputInjection').value.trim();
-            formData.append('injection_details', val === '' ? ' ' : val);
-            formData.append('injection_cost', $('#doctorInjectionCost') ? parseFloat($('#doctorInjectionCost').value) || 0 : 0);
+            let injNames = [];
+            let totalCost = 0;
+            if ($('#doctorInjectionRows')) {
+                const rows = $('#doctorInjectionRows').querySelectorAll('.doc-inj-row');
+                rows.forEach(r => {
+                    const name = r.querySelector('.inj-name').value.trim();
+                    const cost = parseFloat(r.querySelector('.inj-cost').value) || 0;
+                    if (name !== '') injNames.push(name);
+                    totalCost += cost;
+                });
+            }
+            let finalNames = injNames.join(', ');
+            formData.append('injection_details', finalNames === '' ? ' ' : finalNames);
+            formData.append('injection_cost', totalCost);
         } else {
             formData.append('injection_details', '');
             formData.append('injection_cost', 0);
@@ -815,6 +832,43 @@ window.onunhandledrejection = function(event) {
         } catch (err) {
             toast('Failed to save prescription', 'error');
         }
+    };
+
+    window.addDoctorInjectionRow = function(name = '', cost = 0) {
+        const container = $('#doctorInjectionRows');
+        if (!container) return;
+        const row = document.createElement('div');
+        row.className = 'doc-inj-row';
+        row.style.display = 'flex';
+        row.style.gap = '10px';
+        row.style.alignItems = 'flex-end';
+        row.style.marginBottom = '10px';
+        const injId = 'docInj_' + Date.now() + Math.floor(Math.random() * 1000);
+        row.innerHTML = `
+            <div style="flex: 1; position: relative;">
+                <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 2px;">Injection Details</label>
+                <input type="text" placeholder="Enter injection name / details" class="inj-name" id="${injId}" autocomplete="off" oninput="searchInventoryCategory('Injection', this)" value="${name.replace(/"/g, '&quot;')}">
+                <div class="med-suggestions" style="display:none; position:absolute; top:100%; left:0; width:100%; z-index:1000; background:var(--bg-card); border:1px solid var(--border); border-radius:4px; max-height:200px; overflow-y:auto; box-shadow:0 8px 16px rgba(0,0,0,0.5);"></div>
+            </div>
+            <div style="width: 100px;">
+                <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 2px;">Cost (₹)</label>
+                <input type="number" class="inj-cost" placeholder="0" style="background: var(--bg-body); color: var(--text-primary); border: 1px solid var(--border);" value="${cost}">
+            </div>
+            <button type="button" class="btn btn-outline btn-sm" onclick="this.parentElement.remove()" style="margin-bottom: 0px; padding: 6px 10px; color: var(--danger); border-color: var(--danger);">✕</button>
+        `;
+        
+        row.querySelector('.inj-name').addEventListener('keydown', function(e) {
+            const suggBox = row.querySelector('.med-suggestions');
+            if (suggBox.style.display === 'block') {
+                const items = suggBox.querySelectorAll('.med-sugg-item');
+                let activeIdx = Array.from(items).findIndex(i => i.classList.contains('active-sugg'));
+                if (e.key === 'ArrowDown') { e.preventDefault(); if (activeIdx < items.length - 1) activeIdx++; else activeIdx = 0; items.forEach(i => { i.classList.remove('active-sugg'); i.style.background = ''; }); if (items[activeIdx]) { items[activeIdx].classList.add('active-sugg'); items[activeIdx].style.background = 'var(--bg-hover)'; items[activeIdx].scrollIntoView({ block: 'nearest' }); } }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); if (activeIdx > 0) activeIdx--; else activeIdx = items.length - 1; items.forEach(i => { i.classList.remove('active-sugg'); i.style.background = ''; }); if (items[activeIdx]) { items[activeIdx].classList.add('active-sugg'); items[activeIdx].style.background = 'var(--bg-hover)'; items[activeIdx].scrollIntoView({ block: 'nearest' }); } }
+                else if (e.key === 'Enter') { e.preventDefault(); if (activeIdx >= 0 && items[activeIdx]) items[activeIdx].click(); else if (items.length > 0) items[0].click(); }
+            } else if (e.key === 'Enter') { e.preventDefault(); }
+        });
+        
+        container.appendChild(row);
     };
 
     window.submitUpdatedDoctorFeeFromModal = async function () {
