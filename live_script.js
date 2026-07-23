@@ -1056,7 +1056,7 @@ window.onunhandledrejection = function(event) {
         });
     }
 
-    function renderPharmacyTable(patients) {
+    window.renderPharmacyTable = function(patients) {
         const body = $('#prescBody');
         const empty = $('#emptyPresc');
         if (!body) return;
