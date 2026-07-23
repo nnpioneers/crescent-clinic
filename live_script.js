@@ -619,7 +619,7 @@ window.onunhandledrejection = function(event) {
             // Show Edit Fee button for prescribed (moved to pharmacy) patients
             const editFeeBtn = p.status === 'prescribed'
                 ? `<button class="btn btn-outline btn-sm" style="margin-top:8px; font-size:0.78rem; color:var(--accent); border-color:var(--accent);"
-                       onclick="event.stopPropagation(); editDoctorFee(${p.id}, '${p.name.replace(/'/g,"\\'")}')">✏️ Edit Fee</button>`
+                       onclick="event.stopPropagation(); openPrescribe(${p.id})">✏️ Edit Details</button>`
                 : '';
             return `
             <div class="patient-card" onclick="openPrescribe(${p.id})">
@@ -697,17 +697,22 @@ window.onunhandledrejection = function(event) {
                     $('#checkInjection').checked = false;
                     $('#inputInjectionContainer').style.display = 'none';
                 }
-                $('#checkInjection').disabled = !isWaiting;
-                if ($('#inputInjection')) $('#inputInjection').disabled = !isWaiting;
+                } else {
+                    $('#checkInjection').checked = false;
+                    $('#inputInjectionContainer').style.display = 'none';
+                }
+                const isEditable = isWaiting || (p.status === 'prescribed');
+                $('#checkInjection').disabled = !isEditable;
+                if ($('#inputInjection')) $('#inputInjection').disabled = !isEditable;
             }
 
-
-            // Disable most inputs if already approved, but fee stays editable if waiting or prescribed
-            const isPrescribed = p.status === 'prescribed';
-            $('#feeInput').disabled = !(isWaiting || isPrescribed);
-            $('#scanFeeInput').disabled = !isWaiting;
-            if ($('#prescriptionInput')) $('#prescriptionInput').disabled = !isWaiting;
-            if ($('#uptCardInput')) $('#uptCardInput').disabled = !isWaiting;
+            const isEditable = isWaiting || (p.status === 'prescribed');
+            $('#feeInput').disabled = !isEditable;
+            $('#scanFeeInput').disabled = !isEditable;
+            if ($('#prescriptionInput')) $('#prescriptionInput').disabled = !isEditable;
+            if ($('#uptCardInput')) $('#uptCardInput').disabled = !isEditable;
+            if ($('#inputScanName')) $('#inputScanName').disabled = !isEditable;
+            if ($('#inputScanNotes')) $('#inputScanNotes').disabled = !isEditable;
 
             if ($('#uptContainer')) {
                 $('#uptContainer').style.display = DOCTOR_TYPE === 'Lady' ? 'flex' : 'none';
@@ -723,7 +728,7 @@ window.onunhandledrejection = function(event) {
                     $('#checkScan').checked = false;
                     $('#scanFeeContainer').style.display = 'none';
                 }
-                $('#checkScan').disabled = !isWaiting;
+                $('#checkScan').disabled = !isEditable;
             }
 
             // Toggle buttons and message
@@ -731,12 +736,20 @@ window.onunhandledrejection = function(event) {
             const btnUpdate = $('#btnUpdateFee');
             const msg = $('#alreadyApprovedMsg');
             
-            if (btn) btn.style.display = isWaiting ? 'flex' : 'none';
-            if (btnUpdate) btnUpdate.style.display = isPrescribed ? 'flex' : 'none';
+            if (btn) {
+                btn.style.display = isEditable ? 'flex' : 'none';
+                if (p.status === 'prescribed') {
+                    btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Update Details`;
+                } else {
+                    btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;"><path d="M20 6L9 17l-5-5"/></svg> Approve & Send to Pharmacy`;
+                }
+            }
+            if (btnUpdate) btnUpdate.style.display = 'none';
+            
             if (msg) {
-                msg.style.display = isWaiting ? 'none' : 'flex';
-                if (!isWaiting) {
-                    const displayStatus = p.status === 'prescribed' ? 'Consulted' : p.status.charAt(0).toUpperCase() + p.status.slice(1);
+                msg.style.display = isEditable ? 'none' : 'flex';
+                if (!isEditable) {
+                    const displayStatus = p.status.charAt(0).toUpperCase() + p.status.slice(1);
                     msg.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;"><polyline points="20 6 9 17 4 12"/></svg> Consultation already completed (${displayStatus})`;
                 }
             }
