@@ -110,16 +110,19 @@
                 </div>
 
                 <div class="content-card">
-                    <div class="card-header">
-                        <h2 id="tableTitle">Prescription List</h2>
-                        <button class="btn btn-outline btn-sm" onclick="handleRefresh(this)">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <polyline points="23 4 23 10 17 10" />
-                                <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" />
-                            </svg>
-                            Refresh
-                        </button>
+                    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                        <h2 id="tableTitle" style="margin:0;">Prescription List</h2>
+                        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                            <input type="text" id="pharmacySearch" placeholder="Search Token, ID, Name..." class="form-control" style="max-width: 200px; padding: 6px 12px; height: 32px;" oninput="renderPharmacyTable(window.currentPatients)">
+                            <button class="btn btn-outline btn-sm" onclick="handleRefresh(this)">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <polyline points="23 4 23 10 17 10" />
+                                    <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" />
+                                </svg>
+                                Refresh
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body-np">
                         <table class="data-table" id="prescTable">
@@ -128,6 +131,7 @@
                                     <th>Token</th>
                                     <th>Patient ID</th>
                                     <th>Patient</th>
+                                    <th>Age</th>
                                     <th>Doctor</th>
                                     <th>Time In</th>
                                     <th>Time Out</th>

@@ -1067,6 +1067,17 @@ window.onunhandledrejection = function(event) {
             filtered = patients.filter(p => String(p.doctor_id) === String(window.currentPharmacyFilter));
         }
 
+        const searchInput = $('#pharmacySearch');
+        if (searchInput && searchInput.value.trim() !== '') {
+            const q = searchInput.value.toLowerCase().trim();
+            filtered = filtered.filter(p => {
+                return (p.name && p.name.toLowerCase().includes(q)) ||
+                       (p.token && p.token.toLowerCase().includes(q)) ||
+                       (p.patient_id && String(p.patient_id).toLowerCase().includes(q)) ||
+                       (p.phone && String(p.phone).includes(q));
+            });
+        }
+
         if (filtered.length === 0) {
             body.innerHTML = '';
             if (empty) empty.style.display = '';
@@ -1120,6 +1131,7 @@ window.onunhandledrejection = function(event) {
                     <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">+91 ${p.phone}</div>
                     ${uptBadge}
                 </td>
+                <td>${p.age || '-'}</td>
                 <td>${formatDoctorName(p.doctor_name, p.doctor_type)}</td>
                 <td>${timeIn}</td>
                 <td>${timeOut}</td>
@@ -1201,14 +1213,40 @@ window.onunhandledrejection = function(event) {
                     $('#pharmacyCheckInjection').checked = true;
                     $('#pharmacyInjectionInputs').style.display = 'block';
                     if (typeof addPharmacyInjectionRow === 'function') {
-                        addPharmacyInjectionRow();
-                        setTimeout(() => {
-                            const firstRow = $('#pharmacyInjectionRows').querySelector('.medicine-row');
-                            if (firstRow) {
-                                firstRow.querySelector('.inj-name').value = patient.injection_details.trim();
-                                firstRow.querySelector('.inj-cost').value = patient.injection_cost || 0;
+                        try {
+                            let parsed = JSON.parse(patient.injection_details);
+                            if (Array.isArray(parsed) && parsed.length > 0) {
+                                parsed.forEach((inj, idx) => {
+                                    addPharmacyInjectionRow();
+                                    setTimeout(() => {
+                                        const rows = $('#pharmacyInjectionRows').querySelectorAll('.medicine-row');
+                                        const row = rows[idx];
+                                        if (row) {
+                                            row.querySelector('.inj-name').value = inj.name;
+                                            row.querySelector('.inj-cost').value = inj.cost || 0;
+                                        }
+                                    }, 50);
+                                });
+                            } else {
+                                addPharmacyInjectionRow();
+                                setTimeout(() => {
+                                    const firstRow = $('#pharmacyInjectionRows').querySelector('.medicine-row');
+                                    if (firstRow) {
+                                        firstRow.querySelector('.inj-name').value = patient.injection_details.trim();
+                                        firstRow.querySelector('.inj-cost').value = patient.injection_cost || 0;
+                                    }
+                                }, 50);
                             }
-                        }, 50);
+                        } catch(e) {
+                            addPharmacyInjectionRow();
+                            setTimeout(() => {
+                                const firstRow = $('#pharmacyInjectionRows').querySelector('.medicine-row');
+                                if (firstRow) {
+                                    firstRow.querySelector('.inj-name').value = patient.injection_details.trim();
+                                    firstRow.querySelector('.inj-cost').value = patient.injection_cost || 0;
+                                }
+                            }, 50);
+                        }
                     }
                 } else {
                     $('#pharmacyCheckInjection').checked = false;
