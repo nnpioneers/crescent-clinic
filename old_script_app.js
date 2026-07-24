@@ -908,7 +908,7 @@ window.onunhandledrejection = function(event) {
                 ? '<span class="badge badge-consulted">Consulted</span>'
                 : '<span class="badge badge-completed">Completed</span>';
             const actions = isPending
-                ? `<button class="btn btn-warning btn-sm" onclick="openMedicineModal(${p.presc_id}, '${p.name.replace(/'/g, "\\'")}', '${(p.diagnosis || '').replace(/'/g, "\\'")}', '${(p.prescription_text || '').replace(/'/g, "\\'")}')">Add Medicines</button>`
+                ? `<button class="btn btn-warning btn-sm" onclick="openMedicineModal(${p.presc_id}, '${(p.name || '').replace(/'/g, "\\'").replace(/"/g, "&quot;")}', '${(p.diagnosis || '').replace(/'/g, "\\'").replace(/"/g, "&quot;").replace(/[\r\n]+/g, '\\n')}', '${(p.prescription_text || '').replace(/'/g, "\\'").replace(/"/g, "&quot;").replace(/[\r\n]+/g, '\\n')}')">Add Medicines</button>`
                 : `<button class="btn btn-outline btn-sm" onclick="viewDetail(${p.presc_id})">View / PDF</button>`;
 
             const uptBadge = (p.presc_doctor_type === 'Lady' && p.upt_card) ?
