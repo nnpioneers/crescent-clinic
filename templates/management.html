@@ -1583,16 +1583,27 @@
                     loadReportDashboard();
                 }
             }
+            if (id === 'ControlAccess') {
+                if (typeof loadControlAccessDoctors === 'function') {
+                    await loadControlAccessDoctors();
+                }
+            }
 
             stabilizeLayout();
         }
 
         async function loadControlAccessDoctors() {
-            if (!allDoctors || allDoctors.length === 0) {
-                try { allDoctors = await api('/api/doctors'); } catch(e){}
-            }
             const grid = document.getElementById('controlAccessDynamicGrid');
             if (!grid) return;
+
+            if (!allDoctors || allDoctors.length === 0) {
+                try { 
+                    allDoctors = await api('/api/doctors'); 
+                    window.allDoctors = allDoctors;
+                } catch(e) {
+                    console.error('Failed to fetch doctors', e);
+                }
+            }
 
             let html = `
                 <div class="stat-card clickable-card" onclick="openControlAccess('receptionist', '', 'Reception View')">
@@ -1602,20 +1613,18 @@
             `;
 
             try {
-                const docs = window.allDoctors || await api('/api/doctors');
-                if (Array.isArray(docs)) {
-                    docs.forEach(doc => {
-                        const displayName = doc.display_name || doc.username;
-                        const formattedName = formatDoctorName(displayName, doc.doctor_type);
-                        const safeName = formattedName.replace(/'/g, "\\'");
-                        html += `
-                        <div class="stat-card clickable-card" onclick="openControlAccess('doctor', '', '${safeName} View', ${doc.id})">
-                            <div class="stat-label" style="font-weight: 600; font-size: 1rem;">${formattedName}</div>
-                            <div class="stat-value" style="font-size: 1rem; color: var(--primary); margin-top: 5px;">Open Dashboard</div>
-                        </div>
-                        `;
-                    });
-                }
+                const docs = (allDoctors && Array.isArray(allDoctors) && allDoctors.length > 0) ? allDoctors : (window.allDoctors || []);
+                docs.forEach(doc => {
+                    const displayName = doc.display_name || doc.username;
+                    const formattedName = formatDoctorName(displayName, doc.doctor_type);
+                    const safeName = formattedName.replace(/'/g, "\\'");
+                    html += `
+                    <div class="stat-card clickable-card" onclick="openControlAccess('doctor', '', '${safeName} View', ${doc.id})">
+                        <div class="stat-label" style="font-weight: 600; font-size: 1rem;">${formattedName}</div>
+                        <div class="stat-value" style="font-size: 1rem; color: var(--primary); margin-top: 5px;">Open Dashboard</div>
+                    </div>
+                    `;
+                });
             } catch (e) {
                 console.error('Failed to load doctors for control access', e);
             }
