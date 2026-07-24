@@ -1465,37 +1465,15 @@
         }
     </script>
 
-    <!-- Include SweetAlert2 for nice prompts -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
+    <!-- Scripts loaded dynamically when needed -->
     <script src="/static/js/script_app_v2.js?v=20260722_v1" defer></script>
-    <script src="/static/js/reports.js?v=20260722_01" defer></script>
-    <script src="/static/js/agency.js?v=20260722_01" defer></script>
-    <script src="/static/js/inventory.js?v=20260722_01" defer></script>
     <script>
         let allPatients = [];
         let allScans = [];
         let allDoctors = [];
 
         document.addEventListener('DOMContentLoaded', async () => {
-            try {
-                allDoctors = await api('/api/doctors');
-
-                // Populate patient filters
-                const filterContainer = document.getElementById('dynamicPatientFilters');
-                if (filterContainer) {
-                    filterContainer.innerHTML = allDoctors.map(d =>
-                        `<button class="btn btn-outline btn-sm" id="filter${d.id}" onclick="setPatientFilter('${d.id}', this)">${formatDoctorName(d.display_name, d.doctor_type)}</button>`
-                    ).join('');
-                }
-
-                if (typeof loadControlAccessDoctors === 'function') {
-                    loadControlAccessDoctors();
-                }
-
-            } catch (err) {
-                console.error("Failed to load doctors", err);
-            }
+            // Initialization deferred to section loading
         });
 
         function formatDoctorName(name, type) {
@@ -1507,7 +1485,7 @@
 
         window.loadedAdminSections = window.loadedAdminSections || {};
 
-        function showAdminSection(id, btn) {
+        async function showAdminSection(id, btn) {
             document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
             const targetId = 'section' + (id.charAt(0).toUpperCase() + id.slice(1));
             const target = document.getElementById(targetId);
@@ -1532,6 +1510,17 @@
                 window.loadedAdminSections['Dashboard'] = true;
             }
             if (id === 'Inventory') {
+                await window.loadScript('/static/js/inventory.js?v=20260722_01');
+                if (!window.loadedAdminSections['InventoryInit']) {
+                    try {
+                        const agencies = await api('/api/agencies/lookup');
+                        const dataList = document.getElementById('agencyList');
+                        if (dataList && agencies) {
+                            dataList.innerHTML = agencies.map(a => `<option value="${a}"></option>`).join('');
+                        }
+                    } catch (e) { console.error('Failed to load agencies', e); }
+                    window.loadedAdminSections['InventoryInit'] = true;
+                }
                 if (!window.loadedAdminSections['Inventory']) {
                     window.loadedAdminSections['Inventory'] = true;
                 }
@@ -1542,6 +1531,17 @@
                 }
             }
             if (id === 'Patients' && !window.loadedAdminSections['Patients']) {
+                if (!allDoctors || allDoctors.length === 0) {
+                    try {
+                        allDoctors = await api('/api/doctors');
+                        const filterContainer = document.getElementById('dynamicPatientFilters');
+                        if (filterContainer) {
+                            filterContainer.innerHTML = allDoctors.map(d =>
+                                `<button class="btn btn-outline btn-sm" id="filter${d.id}" onclick="setPatientFilter('${d.id}', this)">${formatDoctorName(d.display_name, d.doctor_type)}</button>`
+                            ).join('');
+                        }
+                    } catch (e) { console.error('Failed to load doctors', e); }
+                }
                 loadPatientsList();
                 window.loadedAdminSections['Patients'] = true;
             }
@@ -1558,6 +1558,11 @@
                 window.loadedAdminSections['DirectSales'] = true;
             }
             if (id === 'Agency') {
+                if (!window.loadedAdminSections['SweetAlert']) {
+                    await window.loadScript('https://cdn.jsdelivr.net/npm/sweetalert2@11');
+                    window.loadedAdminSections['SweetAlert'] = true;
+                }
+                await window.loadScript('/static/js/agency.js?v=20260722_01');
                 if (typeof switchAgencyTab === 'function') {
                     let activeBtn = document.querySelector('#agencyTabs .btn.active') || document.querySelector('#agencyTabs .btn');
                     let tabName = 'dashboard';
@@ -1569,6 +1574,11 @@
                 }
             }
             if (id === 'ReportDashboard') {
+                if (!window.loadedAdminSections['SweetAlert']) {
+                    await window.loadScript('https://cdn.jsdelivr.net/npm/sweetalert2@11');
+                    window.loadedAdminSections['SweetAlert'] = true;
+                }
+                await window.loadScript('/static/js/reports.js?v=20260722_01');
                 if (typeof loadReportDashboard === 'function') {
                     loadReportDashboard();
                 }
@@ -1578,6 +1588,9 @@
         }
 
         async function loadControlAccessDoctors() {
+            if (!allDoctors || allDoctors.length === 0) {
+                try { allDoctors = await api('/api/doctors'); } catch(e){}
+            }
             const grid = document.getElementById('controlAccessDynamicGrid');
             if (!grid) return;
 

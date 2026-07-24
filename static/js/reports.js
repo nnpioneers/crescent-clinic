@@ -1539,13 +1539,14 @@ async function saveAutoBackupSettings() {
 }
 
 // Populate settings on load (as a fallback before API load)
-document.addEventListener('DOMContentLoaded', () => {
+const initReportsSettings = () => {
     const wa = localStorage.getItem('whatsapp_backup_number');
     const time = localStorage.getItem('auto_backup_time');
     if (wa && document.getElementById('settingWaNumber')) document.getElementById('settingWaNumber').value = wa;
     if (time && document.getElementById('settingBackupTime')) document.getElementById('settingBackupTime').value = time;
-    window.toggleWaProviderFields();
-});
+    if (typeof window.toggleWaProviderFields === 'function') window.toggleWaProviderFields();
+};
+if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initReportsSettings); } else { initReportsSettings(); }
 
 async function openReportSupplierDetails(supplierId) {
     try {

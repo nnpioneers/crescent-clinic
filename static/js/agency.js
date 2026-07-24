@@ -1639,11 +1639,11 @@ function detectMedicineCategoryJS(itemName) {
     return '';
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+const initAgencySettings = () => {
     const itemNameInput = document.getElementById('agItemName');
     if (itemNameInput) {
         itemNameInput.addEventListener('input', function () {
-            const detected = detectMedicineCategoryJS(this.value);
+            const detected = (typeof detectMedicineCategoryJS === 'function') ? detectMedicineCategoryJS(this.value) : null;
             if (detected) {
                 const catSelect = document.getElementById('agItemCat');
                 if (catSelect) {
@@ -1658,7 +1658,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-});
+};
+if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initAgencySettings); } else { initAgencySettings(); }
 
 async function saveLowStockAlert(id, buttonEl) {
     let inputEl = document.getElementById(`ag-min-stock-${id}`);
