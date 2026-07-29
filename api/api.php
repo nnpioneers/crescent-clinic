@@ -2693,7 +2693,7 @@ if ($uri === '/api/inventory/update' && $method === 'POST') {
 
         // Sync stock & generic mappings
         sync_stock_item($conn, $name, $batch_number, 'pharmacy');
-        sync_generic_mappings($conn);
+        sync_generic_mappings($conn, true);
 
         // Backfill historical zero-cost sales
         $actual_unit_cost = ((int)$tablets_per_strip > 0) ? ((float)$purchase_price / (int)$tablets_per_strip) : (float)$purchase_price;
@@ -5957,7 +5957,14 @@ if ($uri === '/api/cron/backup' && $method === 'GET') {
     json_response($status);
 }
 
-function sync_generic_mappings($conn) {
+function sync_generic_mappings($conn, $force = false) {
+    static $last_sync = 0;
+    $now = time();
+    // Throttle automatic background sync to at most once per 300 seconds (5 minutes) unless forced
+    if (!$force && ($now - $last_sync < 300)) {
+        return;
+    }
+    $last_sync = $now;
     // 0. Auto-cleanup duplicates caused by previous race conditions
     try {
         // Fix batch numbers using IGNORE to avoid unique constraint violations
@@ -6137,9 +6144,7 @@ if ($uri === '/api/generics/list' && $method === 'GET') {
     $q = trim($_GET['q'] ?? '');
     $conn = get_db();
     try {
-        sync_generic_mappings($conn);
-
-        // 4. Query from generic_mappings table
+        // sync_generic_mappings is throttled and triggered on write operations for maximum GET performance
         $params = [];
         $where = "";
         if ($q !== '') {
@@ -6179,7 +6184,6 @@ if ($uri === '/api/generics/brands' && $method === 'GET') {
     }
     $conn = get_db();
     try {
-        sync_generic_mappings($conn);
         $is_unmapped = (strtolower(trim($generic)) === '(unmapped)');
         
         if ($is_unmapped) {
@@ -7212,7 +7216,7 @@ if ($uri === '/api/generics/add' && $method === 'POST') {
         ]);
 
         // Auto-sync generic mappings to ensure live list is up-to-date
-        sync_generic_mappings($conn);
+        sync_generic_mappings($conn, true);
 
         json_response([
             'success' => true,
