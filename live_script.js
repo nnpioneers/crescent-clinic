@@ -653,18 +653,24 @@ window.onunhandledrejection = function(event) {
                 else if (p.spo2 >= 90) color = '#f59e0b'; // Orange
                 else color = '#ef4444'; // Red
                 spo2Html = `<div class="detail-item"><div class="label">SpO2</div><div class="value" style="color: ${color}; font-weight: 600;">${p.spo2}%</div></div>`;
+            } else {
+                spo2Html = `<div class="detail-item"><div class="label">SpO2</div><div class="value">-</div></div>`;
             }
 
             $('#modalPatientDetails').innerHTML = `
-                <div class="detail-item"><div class="label">Age / Gender</div><div class="value">${p.age} / ${p.gender}</div></div>
-                <div class="detail-item"><div class="label">Phone</div><div class="value">${p.phone}</div></div>
-                <div class="detail-item"><div class="label">Complaint</div><div class="value">${p.complaint || '-'}</div></div>
-                <div class="detail-item"><div class="label">Doctor</div><div class="value">${p.doctor_name}</div></div>
-                <div class="detail-item"><div class="label">BP</div><div class="value">${p.bp || '-'}</div></div>
-                <div class="detail-item"><div class="label">Temp</div><div class="value">${p.temp || '-'}</div></div>
-                <div class="detail-item"><div class="label">Pulse</div><div class="value">${p.pulse || '-'}</div></div>
-                <div class="detail-item"><div class="label">Weight / Height</div><div class="value">${p.weight || '-'} / ${p.height || '-'}</div></div>
+                <div class="detail-item"><div class="label">Full Name</div><div class="value">${p.name || '-'}</div></div>
+                <div class="detail-item"><div class="label">Age</div><div class="value">${p.age !== undefined && p.age !== null ? p.age : '-'}</div></div>
+                <div class="detail-item"><div class="label">Gender</div><div class="value">${p.gender || '-'}</div></div>
+                <div class="detail-item"><div class="label">Temperature</div><div class="value">${p.temp || '-'}</div></div>
+                <div class="detail-item"><div class="label">Blood Pressure</div><div class="value">${p.bp || '-'}</div></div>
                 ${spo2Html}
+                <div class="detail-item"><div class="label">Pulse</div><div class="value">${p.pulse || '-'}</div></div>
+                <div class="detail-item"><div class="label">Weight</div><div class="value">${p.weight || '-'}</div></div>
+                <div class="detail-item"><div class="label">Phone</div><div class="value">${p.phone || '-'}</div></div>
+                <div class="detail-item"><div class="label">Height</div><div class="value">${p.height || '-'}</div></div>
+                <div class="detail-item"><div class="label">Address</div><div class="value">${p.address || '-'}</div></div>
+                <div class="detail-item"><div class="label">Complaint</div><div class="value">${p.complaint || '-'}</div></div>
+                <div class="detail-item"><div class="label">Doctor</div><div class="value">${p.doctor_name || '-'}</div></div>
             `;
 
             const isWaiting = p.status === 'waiting';
