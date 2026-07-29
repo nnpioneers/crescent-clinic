@@ -2636,12 +2636,13 @@ if ($uri === '/api/inventory/update' && $method === 'POST') {
 
     if ($is_without_brand) {
         // ─── WITHOUT BRAND: SAFE UPDATE ONLY ─────────────────────────────────
-        // For Without Brand records, NEVER rename, NEVER delete, NEVER merge.
-        // Lock the name to the original DB value (the generic name itself).
-        // Only update pricing, stock, dates, and location fields.
-        $name = $orig_name; // Force use original name — never change identity
+        // Lock generic name and standardize item name to 'GENERIC (Without Brand)'
         $generic_name = $orig_generic !== '' ? $orig_generic : trim($input['generic_name'] ?? '');
-        $brand_name = '(Unmapped Brand)'; // Keep the system brand_name tag
+        if ($generic_name === '' && !empty($orig_name)) {
+            $generic_name = trim(str_ireplace(' (Without Brand)', '', $orig_name));
+        }
+        $name = trim(str_ireplace(' (Without Brand)', '', $generic_name)) . ' (Without Brand)';
+        $brand_name = '(Unmapped Brand)'; // Keep system brand_name tag
 
         $supplier_id = null;
         if ($agency_name !== '') {
@@ -2650,40 +2651,49 @@ if ($uri === '/api/inventory/update' && $method === 'POST') {
             $supplier_id = $supp_stmt->fetchColumn() ?: null;
         }
 
-        // Simple UPDATE — no merge, no delete, no identity change
+        // Update inventory record with standardized name
         $stmt = $conn->prepare("UPDATE inventory SET
-            item_code = ?, generic_name = ?, agency_name = ?,
+            name = ?, item_code = ?, generic_name = ?, agency_name = ?,
             category = ?, hsn_code = ?, batch_number = ?,
             mfg_date = ?, expiry_date = ?, mrp = ?, purchase_price = ?, selling_price = ?,
             stock = ?, tablets_per_strip = ?, min_stock = ?, row_location = ?, col_location = ?,
             supplier_id = ?
             WHERE id = ?");
         $stmt->execute([
-            $item_code, $generic_name, $agency_name,
+            $name, $item_code, $generic_name, $agency_name,
             $category, $hsn_code, $batch_number,
             $mfg_date, $expiry_date, $mrp, $purchase_price, $selling_price,
             $stock, $tablets_per_strip, $min_stock, $row_location, $col_location,
             $supplier_id, $id
         ]);
 
-        // Also update agency_items for the same record (by orig name + orig batch)
-        $curr_agency_stmt = $conn->prepare("SELECT id FROM agency_items WHERE TRIM(LOWER(item_name)) = TRIM(LOWER(?)) AND TRIM(LOWER(batch_number)) = TRIM(LOWER(?))");
-        $curr_agency_stmt->execute([$orig_name, $orig_batch]);
+        // Also update agency_items for the same record (by orig name/id or generic_name + orig batch)
+        $curr_agency_stmt = $conn->prepare("SELECT id FROM agency_items WHERE (TRIM(LOWER(item_name)) = TRIM(LOWER(?)) OR TRIM(LOWER(item_name)) = TRIM(LOWER(?)) OR TRIM(LOWER(item_name)) = '(unmapped brand)') AND TRIM(LOWER(generic_name)) = TRIM(LOWER(?)) AND TRIM(LOWER(batch_number)) = TRIM(LOWER(?)) LIMIT 1");
+        $curr_agency_stmt->execute([$orig_name, $name, $generic_name, $orig_batch]);
         $curr_agency = $curr_agency_stmt->fetch(PDO::FETCH_ASSOC);
         if ($curr_agency) {
             $upd_agency = $conn->prepare("UPDATE agency_items SET
-                generic_name = ?, category = ?, batch_number = ?, expiry_date = ?, mrp = ?,
+                item_name = ?, generic_name = ?, category = ?, batch_number = ?, expiry_date = ?, mrp = ?,
                 stock = ?, row_location = ?, col_location = ?, min_stock = ?, supplier_id = ?
                 WHERE id = ?");
             $upd_agency->execute([
-                $generic_name, $category, $batch_number, $expiry_date, $mrp,
+                $name, $generic_name, $category, $batch_number, $expiry_date, $mrp,
                 $stock, $row_location, $col_location, $min_stock, $supplier_id,
                 $curr_agency['id']
             ]);
         }
 
-        // Sync stock
+        // Clean up any lingering '(Unmapped Brand)' or duplicate placeholder rows for this generic
+        $conn->prepare("DELETE FROM agency_items WHERE (item_name = '(Unmapped Brand)' OR item_name = '(unmapped brand)') AND TRIM(LOWER(generic_name)) = TRIM(LOWER(?)) AND id != ?")
+             ->execute([$generic_name, $curr_agency['id'] ?? 0]);
+        $conn->prepare("DELETE FROM inventory WHERE (name = '(Unmapped Brand)' OR name = '(unmapped brand)') AND TRIM(LOWER(generic_name)) = TRIM(LOWER(?)) AND id != ?")
+             ->execute([$generic_name, $id]);
+        $conn->prepare("DELETE FROM generic_mappings WHERE (brand_name = '(Unmapped Brand)' OR brand_name = '(unmapped brand)') AND TRIM(LOWER(generic_name)) = TRIM(LOWER(?))")
+             ->execute([$generic_name]);
+
+        // Sync stock & generic mappings
         sync_stock_item($conn, $name, $batch_number, 'pharmacy');
+        sync_generic_mappings($conn);
 
         // Backfill historical zero-cost sales
         $actual_unit_cost = ((int)$tablets_per_strip > 0) ? ((float)$purchase_price / (int)$tablets_per_strip) : (float)$purchase_price;
@@ -6006,7 +6016,7 @@ function sync_generic_mappings($conn) {
               AND TRIM(LOWER(generic_name)) IN (
                   SELECT * FROM (
                       SELECT DISTINCT TRIM(LOWER(generic_name)) FROM agency_items 
-                      WHERE item_name LIKE '%(Without Brand)%'
+                      WHERE item_name LIKE '%(Without Brand)%' OR TRIM(LOWER(item_name)) = TRIM(LOWER(generic_name))
                   ) AS tmp
               )
         ");
@@ -6016,7 +6026,7 @@ function sync_generic_mappings($conn) {
               AND TRIM(LOWER(generic_name)) IN (
                   SELECT * FROM (
                       SELECT DISTINCT TRIM(LOWER(generic_name)) FROM inventory 
-                      WHERE name LIKE '%(Without Brand)%'
+                      WHERE name LIKE '%(Without Brand)%' OR TRIM(LOWER(name)) = TRIM(LOWER(generic_name))
                   ) AS tmp
               )
         ");
@@ -6026,7 +6036,7 @@ function sync_generic_mappings($conn) {
               AND TRIM(LOWER(generic_name)) IN (
                   SELECT * FROM (
                       SELECT DISTINCT TRIM(LOWER(generic_name)) FROM generic_mappings 
-                      WHERE brand_name LIKE '%(Without Brand)%'
+                      WHERE brand_name LIKE '%(Without Brand)%' OR TRIM(LOWER(brand_name)) = TRIM(LOWER(generic_name))
                   ) AS tmp
               )
         ");
@@ -6292,6 +6302,48 @@ if ($uri === '/api/generics/brands' && $method === 'GET') {
             $stmt->execute([$generic, $generic]);
         }
         $brands = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (!$is_unmapped && !empty($brands)) {
+            $cleaned = [];
+            $without_brand_rows = [];
+            
+            foreach ($brands as $b) {
+                $bName = trim($b['brand_name'] ?? '');
+                $gName = trim($b['generic_name'] ?? '');
+                $is_wb = (
+                    !empty($b['is_without_brand']) ||
+                    stripos($bName, '(Without Brand)') !== false ||
+                    stripos($bName, '(unmapped brand)') !== false ||
+                    (strtolower($bName) === strtolower($gName) && $gName !== '')
+                );
+                
+                if ($is_wb) {
+                    $clean_gen = trim(str_ireplace(' (Without Brand)', '', $gName !== '' ? $gName : $generic));
+                    $b['brand_name'] = $clean_gen . ' (Without Brand)';
+                    $b['generic_name'] = $clean_gen;
+                    $b['is_without_brand'] = 1;
+                    $without_brand_rows[] = $b;
+                } else {
+                    $cleaned[] = $b;
+                }
+            }
+            
+            if (!empty($without_brand_rows)) {
+                // If there are multiple Without Brand rows (e.g., from unmapped placeholder vs real inventory row),
+                // pick the best row (prefer row with inventory_id, non-zero mrp, or non-zero stock).
+                usort($without_brand_rows, function($a, $b) {
+                    $scoreA = (!empty($a['inventory_id']) ? 100 : 0) + ((float)($a['mrp'] ?? 0) > 0 ? 10 : 0) + ((int)($a['stock'] ?? 0) != 0 ? 5 : 0);
+                    $scoreB = (!empty($b['inventory_id']) ? 100 : 0) + ((float)($b['mrp'] ?? 0) > 0 ? 10 : 0) + ((int)($b['stock'] ?? 0) != 0 ? 5 : 0);
+                    return $scoreB <=> $scoreA;
+                });
+                
+                // Keep only the single best Without Brand row
+                array_unshift($cleaned, $without_brand_rows[0]);
+            }
+            
+            $brands = $cleaned;
+        }
+
         json_response($brands);
     } catch (Exception $e) {
         json_response(['error' => $e->getMessage()], 500);

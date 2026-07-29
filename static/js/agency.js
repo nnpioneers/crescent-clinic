@@ -2179,14 +2179,14 @@ window.gmOpenEditModal = function(encodedBrand) {
     const brand = JSON.parse(decodeURIComponent(encodedBrand));
 
     // ── WITHOUT BRAND PROTECTION ──────────────────────────────────────────────
-    // If this is the "Without Brand" system default record, the real inventory
-    // row has name = generic_name (e.g. "RABE"), NOT "RABE (Without Brand)".
-    // We must pass the real name so the edit form shows/saves correctly, and
-    // inject the is_without_brand flag so the backend skips rename/merge/delete.
-    const isWithoutBrand = !!(brand.is_without_brand);
-    const realName = isWithoutBrand
-        ? (brand.generic_name || brand.brand_name || '')  // use generic_name as actual DB name
-        : (brand.brand_name || '');
+    const isWithoutBrand = !!(brand.is_without_brand) ||
+        (brand.brand_name && brand.brand_name.toLowerCase().includes('(without brand)')) ||
+        (brand.brand_name && brand.brand_name.toLowerCase() === '(unmapped brand)') ||
+        (brand.brand_name && brand.generic_name && brand.brand_name.trim().toLowerCase() === brand.generic_name.trim().toLowerCase());
+
+    const baseGenName = (brand.generic_name || brand.brand_name || '').replace(/\s*\(Without Brand\)$/i, '').trim();
+    const realName = isWithoutBrand ? (baseGenName ? baseGenName + ' (Without Brand)' : brand.brand_name) : (brand.brand_name || '');
+    const displayBrandName = isWithoutBrand ? (baseGenName ? baseGenName + ' (Without Brand)' : brand.brand_name) : (brand.brand_name || '');
     // ─────────────────────────────────────────────────────────────────────────
 
     const bNum = String(brand.batch_number || '');
@@ -2210,8 +2210,8 @@ window.gmOpenEditModal = function(encodedBrand) {
         row_location: brand.row_location || '',
         col_location: brand.col_location || '',
         agency_name: brand.supplier_name || '',
-        generic_name: brand.generic_name || '',
-        brand_name: brand.brand_name || '',
+        generic_name: baseGenName || brand.generic_name || '',
+        brand_name: displayBrandName,
         is_without_brand: isWithoutBrand   // carry the flag into the save payload
     };
     if (typeof window.editMedModal === 'function') {
