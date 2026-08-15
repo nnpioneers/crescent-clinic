@@ -1511,8 +1511,8 @@
             }
             if (id === 'Inventory') {
                 await Promise.all([
-                    window.loadScript('/static/js/inventory.js?v=20260722_01'),
-                    window.loadScript('/static/js/agency.js?v=20260722_01')
+                    window.loadScript('/static/js/inventory.js?v=20260815_05'),
+                    window.loadScript('/static/js/agency.js?v=20260815_05')
                 ]);
                 if (!window.loadedAdminSections['InventoryInit']) {
                     try {
@@ -1565,7 +1565,7 @@
                     await window.loadScript('https://cdn.jsdelivr.net/npm/sweetalert2@11');
                     window.loadedAdminSections['SweetAlert'] = true;
                 }
-                await window.loadScript('/static/js/agency.js?v=20260722_01');
+                await window.loadScript('/static/js/agency.js?v=20260815_05');
                 if (typeof switchAgencyTab === 'function') {
                     let activeBtn = document.querySelector('#agencyTabs .btn.active') || document.querySelector('#agencyTabs .btn');
                     let tabName = 'dashboard';
@@ -1581,7 +1581,7 @@
                     await window.loadScript('https://cdn.jsdelivr.net/npm/sweetalert2@11');
                     window.loadedAdminSections['SweetAlert'] = true;
                 }
-                await window.loadScript('/static/js/reports.js?v=20260722_01');
+                await window.loadScript('/static/js/reports.js?v=20260815_05');
                 if (typeof loadReportDashboard === 'function') {
                     loadReportDashboard();
                 }

@@ -1805,19 +1805,40 @@ async function loadGenericMedicines() {
         if (searchInput) searchInput.value = '';
         
         const data = await api('/api/generics/list');
-        gmAllData = data || [];
+        if (Array.isArray(data)) {
+            gmAllData = data;
+        } else if (data && Array.isArray(data.data)) {
+            gmAllData = data.data;
+        } else {
+            gmAllData = [];
+            if (data && data.error) {
+                console.error('Error from /api/generics/list:', data.error);
+                const tbody = document.getElementById('gmListBody');
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:var(--danger);">${data.error}</td></tr>`;
+                }
+                return;
+            }
+        }
         gmFilteredData = [...gmAllData];
         gmCurrentPage = 1;
 
         // Update total stats
         const statTotal = document.getElementById('gmStatTotal');
         const statBrands = document.getElementById('gmStatBrands');
+        const statFiltered = document.getElementById('gmStatFiltered');
         const totalBrands = gmAllData.reduce((acc, row) => acc + parseInt(row.brand_count || 0), 0);
         if (statTotal) statTotal.textContent = gmAllData.length;
         if (statBrands) statBrands.textContent = totalBrands;
+        if (statFiltered) statFiltered.textContent = `${gmAllData.length} of ${gmAllData.length}`;
 
         renderGmList();
     } catch (e) {
+        console.error('Failed to load generic medicines:', e);
+        const tbody = document.getElementById('gmListBody');
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:var(--danger);">Error loading items: ${e.message || 'Server error'}</td></tr>`;
+        }
         toast(e.message || 'Failed to load generic medicines', 'error');
     }
 }
