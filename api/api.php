@@ -6161,19 +6161,27 @@ if ($uri === '/api/generics/list' && $method === 'GET') {
     $q = trim($_GET['q'] ?? '');
     $conn = get_db();
     try {
-        // sync_generic_mappings is throttled and triggered on write operations for maximum GET performance
+        // Run throttled sync so newly added items or mappings in inventory/agency are up-to-date
+        sync_generic_mappings($conn);
+
         $params = [];
-        $where = "";
+        $conditions = ["generic_name IS NOT NULL", "TRIM(generic_name) != ''"];
         if ($q !== '') {
-            $where = "WHERE generic_name LIKE ? OR brand_name LIKE ?";
-            $params[] = "%$q%";
-            $params[] = "%$q%";
+            $conditions[] = "(LOWER(generic_name) LIKE ? OR LOWER(brand_name) LIKE ?)";
+            $params[] = "%" . strtolower($q) . "%";
+            $params[] = "%" . strtolower($q) . "%";
         }
+        $where = "WHERE " . implode(" AND ", $conditions);
 
         $sql = "
             SELECT 
                 TRIM(generic_name) AS generic_name, 
-                COUNT(*) AS brand_count 
+                COUNT(DISTINCT CASE 
+                    WHEN LOWER(TRIM(brand_name)) NOT IN ('(unmapped brand)', '', '(without brand)') 
+                     AND LOWER(TRIM(brand_name)) != LOWER(TRIM(generic_name))
+                     AND LOWER(TRIM(brand_name)) NOT LIKE '%(without brand)%'
+                    THEN LOWER(TRIM(brand_name))
+                END) AS brand_count 
             FROM generic_mappings
             $where
             GROUP BY TRIM(generic_name)
