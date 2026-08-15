@@ -5975,13 +5975,16 @@ if ($uri === '/api/cron/backup' && $method === 'GET') {
 }
 
 function sync_generic_mappings($conn, $force = false) {
-    static $last_sync = 0;
+    $lock_file = sys_get_temp_dir() . '/sync_gm_last.lock';
     $now = time();
-    // Throttle automatic background sync to at most once per 300 seconds (5 minutes) unless forced
-    if (!$force && ($now - $last_sync < 300)) {
-        return;
+    // Throttle automatic background sync to at most once per 600 seconds (10 minutes) unless forced
+    if (!$force && file_exists($lock_file)) {
+        $last_sync = (int)@file_get_contents($lock_file);
+        if ($now - $last_sync < 600) {
+            return;
+        }
     }
-    $last_sync = $now;
+    @file_put_contents($lock_file, (string)$now);
     // 0. Auto-cleanup duplicates caused by previous race conditions
     try {
         // Fix batch numbers using IGNORE to avoid unique constraint violations
@@ -6157,13 +6160,10 @@ function sync_generic_mappings($conn, $force = false) {
  * Supports optional ?q= search filter for the Generic Medicine List page.
  */
 if ($uri === '/api/generics/list' && $method === 'GET') {
-    enforce_api_auth(['pharmacist']);
+    enforce_api_auth(['pharmacist', 'receptionist', 'doctor']);
     $q = trim($_GET['q'] ?? '');
     $conn = get_db();
     try {
-        // Run throttled sync so newly added items or mappings in inventory/agency are up-to-date
-        sync_generic_mappings($conn);
-
         $params = [];
         $conditions = ["generic_name IS NOT NULL", "TRIM(generic_name) != ''"];
         if ($q !== '') {
@@ -6202,7 +6202,7 @@ if ($uri === '/api/generics/list' && $method === 'GET') {
  * Returns all distinct brand medicines mapped to the given generic name with full live stock info.
  */
 if ($uri === '/api/generics/brands' && $method === 'GET') {
-    enforce_api_auth(['pharmacist']);
+    enforce_api_auth(['pharmacist', 'receptionist', 'doctor']);
     $generic = trim($_GET['generic'] ?? '');
     if ($generic === '') {
         json_response(['error' => 'generic parameter is required'], 400);
