@@ -1510,7 +1510,10 @@
                 window.loadedAdminSections['Dashboard'] = true;
             }
             if (id === 'Inventory') {
-                await window.loadScript('/static/js/inventory.js?v=20260722_01');
+                await Promise.all([
+                    window.loadScript('/static/js/inventory.js?v=20260722_01'),
+                    window.loadScript('/static/js/agency.js?v=20260722_01')
+                ]);
                 if (!window.loadedAdminSections['InventoryInit']) {
                     try {
                         const agencies = await api('/api/agencies/lookup');

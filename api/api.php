@@ -2148,7 +2148,7 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
         $gm_query .= " ORDER BY generic_name ASC LIMIT 30";
     }
     
-    $stmt2 = $conn->prepare($gm_query);
+$stmt2 = $conn->prepare($gm_query);
     $stmt2->execute($gm_params);
     $gm_generics = $stmt2->fetchAll(PDO::FETCH_COLUMN);
 
@@ -2184,12 +2184,30 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
     // ─────────────────────────────────────────────────────────────────────────
 
     $final_results = [];
-    $stmt_count = $conn->prepare("SELECT COUNT(*) FROM inventory WHERE generic_name = ? AND name != '(Unmapped Brand)' AND batch_number NOT LIKE 'ph_%' AND name NOT LIKE '%(Without Brand)%'");
+    $counts_map = [];
+    if (!empty($gm_generics)) {
+        $valid_gns = array_values(array_filter($gm_generics));
+        if (!empty($valid_gns)) {
+            $gn_placeholders = implode(',', array_fill(0, count($valid_gns), '?'));
+            $stmt_batch_count = $conn->prepare("
+                SELECT generic_name, COUNT(*) as brand_count 
+                FROM inventory 
+                WHERE generic_name IN ($gn_placeholders) 
+                  AND name != '(Unmapped Brand)' 
+                  AND batch_number NOT LIKE 'ph_%' 
+                  AND name NOT LIKE '%(Without Brand)%'
+                GROUP BY generic_name
+            ");
+            $stmt_batch_count->execute($valid_gns);
+            while ($cRow = $stmt_batch_count->fetch(PDO::FETCH_ASSOC)) {
+                $counts_map[strtolower(trim($cRow['generic_name']))] = (int)$cRow['brand_count'];
+            }
+        }
+    }
     
     foreach ($gm_generics as $g_name) {
         if (empty($g_name)) continue;
-        $stmt_count->execute([$g_name]);
-        $brand_count = (int)$stmt_count->fetchColumn();
+        $brand_count = $counts_map[strtolower(trim($g_name))] ?? 0;
 
         $final_results[] = [
             'id' => -1 * abs(crc32($g_name)),
@@ -2245,8 +2263,7 @@ if ($uri === '/api/inventory/search' && $method === 'GET') {
                         $gm_generics[] = $gn;
                         $existing_lower[] = $gn_lower;
                         // Also add the header to final_results!
-                        $stmt_count->execute([$gn]);
-                        $brand_count = (int)$stmt_count->fetchColumn();
+                        $brand_count = $counts_map[$gn_lower] ?? 0;
                         $final_results[] = [
                             'id' => -1 * abs(crc32($gn)),
                             'name' => $gn,

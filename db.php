@@ -64,55 +64,22 @@ function get_db()
             }
         }
 
-        // Auto-initialize if database is empty (check if 'users' table exists)
-        $stmt = $conn->query("SHOW TABLES LIKE 'users'");
-        if (!$stmt->fetch()) {
-            init_db_schema($conn);
-        } else {
-            // Run a one-time migration to convert existing male doctor records to 'Gents'
-            $conn->exec("UPDATE users SET doctor_type='Gents' WHERE role='doctor' AND doctor_type != 'Gents' AND doctor_type != 'Lady'");
-            $conn->exec("UPDATE users SET token_prefix='G' WHERE role='doctor' AND doctor_type='Gents'");
-            $conn->exec("UPDATE users SET token_prefix='L' WHERE role='doctor' AND doctor_type='Lady'");
-        }
-
-        // Always run column migrations once per process to keep existing DBs up-to-date
-        if (!$migrated) {
-            $migrated = true;
-            // Get all existing columns of the inventory table
-            $existing_cols = [];
+        // Run schema migrations and ensure performance indexes once, avoiding expensive per-request DDL
+        $migration_marker = __DIR__ . '/.db_schema_migrated';
+        if (!file_exists($migration_marker)) {
             try {
-                $q = $conn->query("SHOW COLUMNS FROM inventory");
-                if ($q) {
-                    $all_rows = $q->fetchAll(PDO::FETCH_ASSOC);
-                    foreach ($all_rows as $row) {
-                        $existing_cols[] = strtolower($row['Field']);
-                    }
-                    $q->closeCursor();
+                // Auto-initialize if database is empty (check if 'users' table exists)
+                $stmt = $conn->query("SHOW TABLES LIKE 'users'");
+                if (!$stmt->fetch()) {
+                    init_db_schema($conn);
+                } else {
+                    // Run a one-time migration to convert existing male doctor records to 'Gents'
+                    $conn->exec("UPDATE users SET doctor_type='Gents' WHERE role='doctor' AND doctor_type != 'Gents' AND doctor_type != 'Lady'");
+                    $conn->exec("UPDATE users SET token_prefix='G' WHERE role='doctor' AND doctor_type='Gents'");
+                    $conn->exec("UPDATE users SET token_prefix='L' WHERE role='doctor' AND doctor_type='Lady'");
                 }
-            } catch (Exception $e) {
-                // Table might not exist yet or other error, fallback to exec with try-catch
-            }
 
-            $col_migrations = [
-                'generic_name' => "ALTER TABLE inventory ADD COLUMN generic_name VARCHAR(255) DEFAULT NULL",
-                'brand_name' => "ALTER TABLE inventory ADD COLUMN brand_name VARCHAR(255) DEFAULT NULL",
-                'agency_name' => "ALTER TABLE inventory ADD COLUMN agency_name VARCHAR(255) DEFAULT NULL",
-                'row_location' => "ALTER TABLE inventory ADD COLUMN row_location VARCHAR(100) DEFAULT NULL",
-                'col_location' => "ALTER TABLE inventory ADD COLUMN col_location VARCHAR(100) DEFAULT NULL",
-            ];
-
-            foreach ($col_migrations as $col_name => $sql) {
-                if (empty($existing_cols) || !in_array(strtolower($col_name), $existing_cols)) {
-                    try {
-                        $conn->exec($sql);
-                    } catch (Exception $e) {
-                        // Fallback/ignore if already exists or fails
-                    }
-                }
-            }
-
-            // Create generic_mappings table if not exists
-            try {
+                // Ensure generic_mappings table exists
                 $conn->exec("
                     CREATE TABLE IF NOT EXISTS generic_mappings (
                         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -136,41 +103,64 @@ function get_db()
                         UNIQUE KEY uniq_brand_batch (brand_name, batch_number)
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
                 ");
-            } catch (Exception $e) {
-                // Ignore if error
-            }
 
-            // Self-healing columns for generic_mappings
-            $existing_gm_cols = [];
-            try {
-                $q = $conn->query("SHOW COLUMNS FROM generic_mappings");
+                // Ensure required columns exist on inventory
+                $existing_cols = [];
+                $q = $conn->query("SHOW COLUMNS FROM inventory");
                 if ($q) {
-                    $all_rows = $q->fetchAll(PDO::FETCH_ASSOC);
-                    foreach ($all_rows as $row) {
-                        $existing_gm_cols[] = strtolower($row['Field']);
+                    while ($row = $q->fetch(PDO::FETCH_ASSOC)) {
+                        $existing_cols[] = strtolower($row['Field']);
                     }
                     $q->closeCursor();
                 }
-            } catch (Exception $e) {}
 
-            $gm_col_migrations = [
-                'expiry_date' => "ALTER TABLE generic_mappings ADD COLUMN expiry_date VARCHAR(100) DEFAULT NULL",
-                'min_stock' => "ALTER TABLE generic_mappings ADD COLUMN min_stock INT DEFAULT 0",
-                'category' => "ALTER TABLE generic_mappings ADD COLUMN category VARCHAR(100) DEFAULT NULL",
-            ];
-
-            foreach ($gm_col_migrations as $col_name => $sql) {
-                if (empty($existing_gm_cols) || !in_array(strtolower($col_name), $existing_gm_cols)) {
-                    try {
-                        $conn->exec($sql);
-                    } catch (Exception $e) {}
+                $col_migrations = [
+                    'generic_name' => "ALTER TABLE inventory ADD COLUMN generic_name VARCHAR(255) DEFAULT NULL",
+                    'brand_name' => "ALTER TABLE inventory ADD COLUMN brand_name VARCHAR(255) DEFAULT NULL",
+                    'agency_name' => "ALTER TABLE inventory ADD COLUMN agency_name VARCHAR(255) DEFAULT NULL",
+                    'row_location' => "ALTER TABLE inventory ADD COLUMN row_location VARCHAR(100) DEFAULT NULL",
+                    'col_location' => "ALTER TABLE inventory ADD COLUMN col_location VARCHAR(100) DEFAULT NULL",
+                ];
+                foreach ($col_migrations as $col_name => $sql) {
+                    if (!in_array(strtolower($col_name), $existing_cols)) {
+                        try { $conn->exec($sql); } catch (Exception $e) {}
+                    }
                 }
+
+                // Ensure required columns exist on generic_mappings
+                $existing_gm_cols = [];
+                $q_gm = $conn->query("SHOW COLUMNS FROM generic_mappings");
+                if ($q_gm) {
+                    while ($row = $q_gm->fetch(PDO::FETCH_ASSOC)) {
+                        $existing_gm_cols[] = strtolower($row['Field']);
+                    }
+                    $q_gm->closeCursor();
+                }
+
+                $gm_col_migrations = [
+                    'expiry_date' => "ALTER TABLE generic_mappings ADD COLUMN expiry_date VARCHAR(100) DEFAULT NULL",
+                    'min_stock' => "ALTER TABLE generic_mappings ADD COLUMN min_stock INT DEFAULT 0",
+                    'category' => "ALTER TABLE generic_mappings ADD COLUMN category VARCHAR(100) DEFAULT NULL",
+                ];
+                foreach ($gm_col_migrations as $col_name => $sql) {
+                    if (!in_array(strtolower($col_name), $existing_gm_cols)) {
+                        try { $conn->exec($sql); } catch (Exception $e) {}
+                    }
+                }
+
+                // Run supplier_id sync
+                try {
+                    $conn->exec("UPDATE inventory i JOIN agency_suppliers s ON TRIM(LOWER(i.agency_name)) = TRIM(LOWER(s.name)) SET i.supplier_id = s.id WHERE i.supplier_id IS NULL");
+                    $conn->exec("UPDATE agency_items a JOIN inventory i ON a.item_name = i.name AND a.batch_number = i.batch_number AND a.supplier_id IS NULL AND i.supplier_id IS NOT NULL SET a.supplier_id = i.supplier_id");
+                } catch (Exception $e) {}
+
+                // Create performance indexes
+                ensure_performance_indexes($conn);
+
+                @file_put_contents($migration_marker, (string)time());
+            } catch (Exception $e) {
+                // If migration check encounters an error, proceed with connection
             }
-            // One-time/run-time sync for supplier_ids on existing manual items
-            try {
-                $conn->exec("UPDATE inventory i JOIN agency_suppliers s ON TRIM(LOWER(i.agency_name)) = TRIM(LOWER(s.name)) SET i.supplier_id = s.id WHERE i.supplier_id IS NULL");
-                $conn->exec("UPDATE agency_items a JOIN inventory i ON a.item_name = i.name AND a.batch_number = i.batch_number AND a.supplier_id IS NULL AND i.supplier_id IS NOT NULL SET a.supplier_id = i.supplier_id");
-            } catch (Exception $e) {}
         }
 
         return $conn;
@@ -181,6 +171,50 @@ function get_db()
             http_response_code(500);
         }
         die(json_encode(['error' => 'DB Connection Error: ' . $e->getMessage()]));
+    }
+}
+
+function ensure_performance_indexes($conn)
+{
+    $indexes = [
+        'generic_mappings' => [
+            'idx_gm_generic_name' => 'generic_name',
+            'idx_gm_brand_name' => 'brand_name',
+            'idx_gm_agency_name' => 'agency_name',
+            'idx_gm_category' => 'category',
+        ],
+        'inventory' => [
+            'idx_inv_generic_name' => 'generic_name',
+            'idx_inv_name' => 'name',
+            'idx_inv_agency_name' => 'agency_name',
+            'idx_inv_category' => 'category',
+            'idx_inv_supplier_id' => 'supplier_id',
+        ],
+        'agency_items' => [
+            'idx_ai_generic_name' => 'generic_name',
+            'idx_ai_item_name' => 'item_name',
+            'idx_ai_supplier_id' => 'supplier_id',
+        ]
+    ];
+
+    foreach ($indexes as $table => $tbl_indexes) {
+        try {
+            $existing_indexes = [];
+            $q = $conn->query("SHOW INDEX FROM `$table`");
+            if ($q) {
+                while ($row = $q->fetch(PDO::FETCH_ASSOC)) {
+                    $existing_indexes[$row['Key_name']] = true;
+                }
+                $q->closeCursor();
+            }
+            foreach ($tbl_indexes as $idx_name => $column) {
+                if (!isset($existing_indexes[$idx_name])) {
+                    try {
+                        $conn->exec("CREATE INDEX `$idx_name` ON `$table` (`$column`)");
+                    } catch (Exception $e) {}
+                }
+            }
+        } catch (Exception $e) {}
     }
 }
 

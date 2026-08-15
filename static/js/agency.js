@@ -1784,7 +1784,7 @@ function fallbackShare(blob, filename) {
 let gmAllData = []; // Store raw generics list
 let gmFilteredData = []; // Store currently filtered list
 let gmCurrentPage = 1;
-const gmPageSize = 10;
+const gmPageSize = 20;
 let gmSelectedGeneric = ''; // Track currently active generic in detail view
 let gmSelectedItems = new Set(); // Track selected items for bulk action
 
@@ -1884,8 +1884,6 @@ window.gmDeleteBrandAllMappings = async function(brandName) {
     } catch (e) {
         toast(e.message || 'Failed to delete brand mappings.', 'error');
     }
-}
-
 // Filter the list based on search query
 function gmFilterList(query) {
     const q = query.toLowerCase().trim();
@@ -1902,26 +1900,31 @@ function gmFilterList(query) {
 
 // Render the paginated list table
 function renderGmList() {
-    const start = 0;
-    const paginatedItems = gmFilteredData;
+    const totalItems = gmFilteredData.length;
+    const totalPages = Math.ceil(totalItems / gmPageSize) || 1;
+    if (gmCurrentPage > totalPages) gmCurrentPage = totalPages;
+    if (gmCurrentPage < 1) gmCurrentPage = 1;
+
+    const start = (gmCurrentPage - 1) * gmPageSize;
+    const end = start + gmPageSize;
+    const paginatedItems = gmFilteredData.slice(start, end);
     const tbody = document.getElementById('gmListBody');
     const statFiltered = document.getElementById('gmStatFiltered');
-    const paginationEl = document.getElementById('gmPagination');
 
     // Update filtered stat
-    if (statFiltered) statFiltered.textContent = `${gmFilteredData.length} of ${gmAllData.length}`;
+    if (statFiltered) statFiltered.textContent = `${totalItems} of ${gmAllData.length}`;
 
     if (!tbody) return; // elements not in DOM yet
 
     if (paginatedItems.length === 0) {
         tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:var(--text-secondary);">No items found.</td></tr>`;
-        if (paginationEl) paginationEl.innerHTML = '';
+        renderGmPagination(0, 1, 1);
         return;
     }
 
     tbody.innerHTML = paginatedItems.map((item, index) => {
         const globalIdx = start + index + 1;
-        const genericEscaped = (item.generic_name || '').replace(/'/g, "\\'");
+        const genericEscaped = (item.generic_name || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
         const genericAttr = (item.generic_name || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
         const isChecked = gmSelectedItems.has(item.generic_name) ? 'checked' : '';
         return `
@@ -1949,21 +1952,64 @@ function renderGmList() {
     }
     updateBulkDeleteButton();
 
-    renderGmPagination();
+    renderGmPagination(totalItems, totalPages, gmCurrentPage);
 }
 
 // Render pagination controls
-function renderGmPagination() {
+function renderGmPagination(totalItems, totalPages, currentPage) {
     const container = document.getElementById('gmPagination');
-    if (container) {
+    if (!container) return;
+
+    if (totalItems <= gmPageSize) {
         container.innerHTML = '';
+        return;
     }
+
+    const startItem = ((currentPage - 1) * gmPageSize) + 1;
+    const endItem = Math.min(currentPage * gmPageSize, totalItems);
+
+    let html = `
+        <div style="display:flex; align-items:center; justify-content:space-between; width:100%; flex-wrap:wrap; gap:10px; margin-top:8px;">
+            <div style="font-size:0.85rem; color:var(--text-secondary);">
+                Showing <strong>${startItem}</strong>–<strong>${endItem}</strong> of <strong>${totalItems}</strong> items
+            </div>
+            <div style="display:flex; gap:4px; align-items:center;">
+                <button class="btn btn-outline btn-sm" onclick="gmGoToPage(1)" ${currentPage === 1 ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''} title="First Page">« First</button>
+                <button class="btn btn-outline btn-sm" onclick="gmGoToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''} title="Previous Page">‹ Prev</button>
+    `;
+
+    // Dynamic numeric page range (show up to 5 adjacent pages)
+    const maxPagesToShow = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+    let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+    if (endPage - startPage + 1 < maxPagesToShow) {
+        startPage = Math.max(1, endPage - maxPagesToShow + 1);
+    }
+
+    for (let p = startPage; p <= endPage; p++) {
+        const isActive = (p === currentPage);
+        html += `<button class="btn btn-sm ${isActive ? 'btn-primary' : 'btn-outline'}" onclick="gmGoToPage(${p})" style="min-width:32px; ${isActive ? 'font-weight:700;' : ''}">${p}</button>`;
+    }
+
+    html += `
+                <button class="btn btn-outline btn-sm" onclick="gmGoToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''} title="Next Page">Next ›</button>
+                <button class="btn btn-outline btn-sm" onclick="gmGoToPage(${totalPages})" ${currentPage === totalPages ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''} title="Last Page">Last »</button>
+            </div>
+        </div>
+    `;
+
+    container.innerHTML = html;
 }
 
 function gmGoToPage(page) {
     gmCurrentPage = page;
     renderGmList();
+    const tableEl = document.getElementById('gmListTable');
+    if (tableEl) {
+        tableEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
 }
+window.gmGoToPage = gmGoToPage;
 
 // Bulk Actions Helper Functions
 function gmDecodeAttr(str) {
@@ -1994,7 +2040,11 @@ function updateBulkDeleteButton() {
 }
 
 window.gmToggleSelectAll = function(source) {
-    const paginatedItems = gmFilteredData;
+    const totalItems = gmFilteredData.length;
+    const totalPages = Math.ceil(totalItems / gmPageSize) || 1;
+    const start = (gmCurrentPage - 1) * gmPageSize;
+    const end = start + gmPageSize;
+    const paginatedItems = gmFilteredData.slice(start, end);
     
     paginatedItems.forEach(item => {
         if (source.checked) {
@@ -2020,7 +2070,11 @@ window.gmOnRowSelect = function(cb) {
         gmSelectedItems.delete(generic);
     }
     
-    const paginatedItems = gmFilteredData;
+    const totalItems = gmFilteredData.length;
+    const totalPages = Math.ceil(totalItems / gmPageSize) || 1;
+    const start = (gmCurrentPage - 1) * gmPageSize;
+    const end = start + gmPageSize;
+    const paginatedItems = gmFilteredData.slice(start, end);
     const selectAllCb = document.getElementById('gmSelectAll');
     if (selectAllCb) {
         const allVisibleSelected = paginatedItems.length > 0 && paginatedItems.every(item => gmSelectedItems.has(item.generic_name));

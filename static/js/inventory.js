@@ -388,11 +388,12 @@
         // ─── DIRECT MEDICINE SALES – Admin Functions ───
         let _dsCurrentFilter = 'today';
 
-        // Auto-refresh inventory every 5 seconds if tab is active and search input is not focused
+        // Auto-refresh inventory every 5 seconds if Medicines subtab is active and search input is not focused
         setInterval(() => {
+            const medTab = document.getElementById('inv-medicines');
             const tbody = document.getElementById('inventoryBody');
             const searchInput = document.getElementById('invSearch');
-            if (tbody && tbody.offsetWidth > 0 && tbody.offsetHeight > 0) {
+            if (medTab && medTab.style.display !== 'none' && tbody && tbody.offsetWidth > 0 && tbody.offsetHeight > 0) {
                 // Skip reload if search input is currently focused by the user
                 if (searchInput && document.activeElement === searchInput) {
                     return;
