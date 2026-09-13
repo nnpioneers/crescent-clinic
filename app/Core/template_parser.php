@@ -10,8 +10,8 @@ class TemplateParser {
             return "Template not found: $templatePath";
         }
         
-        if (function_exists('csrf_token') && !isset($data['csrf_token'])) {
-            $data['csrf_token'] = csrf_token();
+        if (!isset($data['csrf_token'])) {
+            $data['csrf_token'] = $_SESSION['csrf_token'] ?? '';
         }
 
         $content = file_get_contents($templatePath);
