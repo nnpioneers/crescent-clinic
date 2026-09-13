@@ -1,0 +1,1 @@
+<?php require 'db.php'; $conn = get_db(); $stmt = $conn->query('SELECT COUNT(*) FROM inventory'); echo 'Count: ' . $stmt->fetchColumn();
