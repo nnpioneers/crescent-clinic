@@ -1,0 +1,10 @@
+{
+  "name": "crescent-clinic",
+  "version": "1.0.0",
+  "description": "Crescent Clinic Management System",
+  "main": "index.php",
+  "scripts": {
+    "start": "php -S localhost:8000 index.php"
+  },
+  "private": true
+}
