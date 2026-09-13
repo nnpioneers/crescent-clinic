@@ -40,14 +40,14 @@ function get_db()
         $username = getenv('DB_USER') ?: 'root';
         $password = getenv('DB_PASSWORD') !== false ? getenv('DB_PASSWORD') : '';
 
-        // Candidate credential sets: 1) explicit env credentials, 2) local fallback defaults
+        // Prioritize explicit credentials from environment (.env)
         $candidates = [];
         $candidates[] = [$host, $dbname, $username, $password];
-        if ($host !== '127.0.0.1') {
-            $candidates[] = ['127.0.0.1', 'crescent_hospital', 'root', ''];
-        }
-        if ($host !== 'localhost') {
-            $candidates[] = ['localhost', 'crescent_hospital', 'root', ''];
+
+        // Only try secondary loopback host if DB_HOST was default 'localhost' or '127.0.0.1' and using default root
+        if (($host === 'localhost' || $host === '127.0.0.1') && $username === 'root' && $password === '') {
+            $alt_host = ($host === 'localhost') ? '127.0.0.1' : 'localhost';
+            $candidates[] = [$alt_host, $dbname, $username, $password];
         }
 
         $last_exception = null;
