@@ -3,19 +3,20 @@
  * Database Configuration and Helpers (PHP/PDO Version)
  */
 
-// Fast environment loading - skip disk read if already in environment
-if (!getenv('DB_HOST')) {
-    $env_path = __DIR__ . '/.env';
-    if (file_exists($env_path)) {
-        $lines = file($env_path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        if (is_array($lines)) {
-            foreach ($lines as $line) {
-                if (strpos(trim($line), '#') === 0) continue;
-                if (strpos($line, '=') !== false) {
-                    list($name, $value) = explode('=', $line, 2);
-                    putenv(trim($name) . '=' . trim($value));
-                    $_ENV[trim($name)] = trim($value);
-                }
+// Fast environment loading
+$env_path = __DIR__ . '/.env';
+if (file_exists($env_path)) {
+    $lines = file($env_path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if (is_array($lines)) {
+        foreach ($lines as $line) {
+            $trimmed = trim($line);
+            if (strpos($trimmed, '#') === 0) continue;
+            if (strpos($line, '=') !== false) {
+                list($name, $value) = explode('=', $line, 2);
+                $name = trim($name);
+                $value = trim($value);
+                putenv("$name=$value");
+                $_ENV[$name] = $value;
             }
         }
     }
@@ -35,24 +36,26 @@ function get_db()
 
     try {
         $host = getenv('DB_HOST') ?: 'localhost';
-        $dbname = getenv('DB_NAME');
-        $username = getenv('DB_USER');
-        $password = getenv('DB_PASSWORD');
+        $dbname = getenv('DB_NAME') ?: 'crescent_hospital';
+        $username = getenv('DB_USER') ?: 'root';
+        $password = getenv('DB_PASSWORD') !== false ? getenv('DB_PASSWORD') : '';
 
-        // Candidate credential sets: 1) explicit env, 2) local XAMPP defaults (without exposed secrets)
+        // Candidate credential sets: 1) explicit env credentials, 2) local fallback defaults
         $candidates = [];
-        if ($dbname !== false && $dbname !== null && $dbname !== '') {
-            $candidates[] = [$host, $dbname, $username, $password];
+        $candidates[] = [$host, $dbname, $username, $password];
+        if ($host !== '127.0.0.1') {
+            $candidates[] = ['127.0.0.1', 'crescent_hospital', 'root', ''];
         }
-        $candidates[] = ['127.0.0.1', 'crescent_hospital', 'root', ''];
-        $candidates[] = ['localhost', 'crescent_hospital', 'root', ''];
+        if ($host !== 'localhost') {
+            $candidates[] = ['localhost', 'crescent_hospital', 'root', ''];
+        }
 
         $last_exception = null;
         foreach ($candidates as $cand) {
             list($cH, $cDb, $cU, $cP) = $cand;
             try {
                 $conn = new PDO("mysql:host=$cH;dbname=$cDb;charset=utf8mb4", $cU, $cP, [
-                    PDO::ATTR_TIMEOUT => 2
+                    PDO::ATTR_TIMEOUT => 3
                 ]);
                 $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
                 $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
@@ -67,7 +70,7 @@ function get_db()
         }
 
         if (!$conn) {
-            throw ($last_exception ?: new PDOException("Could not connect to any database candidate"));
+            throw ($last_exception ?: new PDOException("Could not connect to database"));
         }
 
         // Fast-path: Check persistent migration marker. Never run DDL on normal requests.
